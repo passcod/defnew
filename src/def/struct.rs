@@ -1,6 +1,7 @@
 use super::{
 	alignment::{Alignable, Alignment},
 	layout::{CowDef, Layable, Layout},
+	parse::{self, Parse, ParseError},
 	sexp_pair, Def,
 };
 use lexpr::Value;
@@ -136,5 +137,41 @@ impl From<Struct> for Value {
 		}
 
 		Self::list(def)
+	}
+}
+
+impl Parse for Struct {
+	fn from_sexp(sexp: &Value) -> Result<Self, ParseError> {
+		let name = parse::str_field(&sexp, "name").map(ToString::to_string);
+		let packed = parse::alignment_field(&sexp, "packed")?;
+		let align = parse::alignment_field(&sexp, "align")?;
+
+		let mut fields = Vec::new();
+		for field in sexp.to_ref_vec().unwrap_or_default() {
+			let (kind, name, def) = match (field.get(0), field.get(1), field.get(2)) {
+				(Some(Value::Symbol(kind)), Some(Value::String(name)), Some(def)) => {
+					(kind, Some(name), def)
+				}
+				(Some(Value::Symbol(kind)), Some(def), None) => (kind, None, def),
+				_ => continue,
+			};
+
+			if kind.as_ref() != "field" {
+				continue;
+			}
+
+			fields.push(if let Some(name) = name {
+				Field::named(name.as_ref(), Def::from_sexp(def)?)
+			} else {
+				Field::anonymous(Def::from_sexp(def)?)
+			});
+		}
+
+		Ok(Self {
+			name,
+			packed,
+			align,
+			fields,
+		})
 	}
 }

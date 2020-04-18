@@ -1,6 +1,7 @@
 use super::{
 	alignment::{Alignable, Alignment},
 	layout::{CowDef, Layable, Layout},
+	parse::{self, Parse, ParseError},
 	sexp_pair, ByteWidth, Def, Endianness,
 };
 use lexpr::Value;
@@ -15,7 +16,7 @@ pub enum Context {
 
 impl From<Context> for Value {
 	fn from(native: Context) -> Self {
-		Self::string(native.to_string())
+		Self::symbol(native.to_string())
 	}
 }
 
@@ -39,20 +40,20 @@ impl fmt::Display for Context {
 }
 
 impl FromStr for Context {
-	type Err = ParseContextError;
+	type Err = InvalidContextError;
 
 	fn from_str(s: &str) -> Result<Self, Self::Err> {
 		match s {
 			"local" => Ok(Self::Local),
 			"remote" => Ok(Self::Remote),
-			_ => Err(ParseContextError),
+			_ => Err(InvalidContextError),
 		}
 	}
 }
 
 #[derive(Debug, Error)]
 #[error("pointer context may be local or remote")]
-pub struct ParseContextError;
+pub struct InvalidContextError;
 
 #[derive(Clone, Debug)]
 pub struct Pointer {
@@ -93,5 +94,29 @@ impl From<Pointer> for Value {
 			sexp_pair(Self::symbol("context"), native.context),
 			Self::Number(native.value.into()),
 		])
+	}
+}
+
+impl Parse for Pointer {
+	fn from_sexp(sexp: &Value) -> Result<Self, ParseError> {
+		let endian = parse::endianness_field(&sexp, "endian")?.unwrap_or_default();
+		let width = parse::required("width", parse::nonzero_u8_field(&sexp, "width")?)?;
+		let context = parse::required("context", parse::sym_field(&sexp, "context"))?.parse()?;
+
+		let value = sexp
+			.to_ref_vec()
+			.and_then(|mut v| v.pop())
+			.ok_or(ParseError::EmptyList)
+			.and_then(|v| {
+				v.as_u64()
+					.ok_or_else(|| ParseError::MissingField("<pointer value>".into()))
+			})?;
+
+		Ok(Self {
+			endian,
+			width,
+			context,
+			value,
+		})
 	}
 }

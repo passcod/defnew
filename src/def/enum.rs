@@ -2,6 +2,7 @@ use super::{
 	alignment::{Alignable, Alignment},
 	div_round_up,
 	layout::{CowDef, Layable, Layout},
+	parse::{self, Parse, ParseError},
 	sexp_pair, ByteWidth, Def, Endianness,
 };
 use lexpr::Value;
@@ -80,5 +81,47 @@ impl From<Enum> for Value {
 		}
 
 		Self::list(def)
+	}
+}
+
+impl Parse for Enum {
+	fn from_sexp(sexp: &Value) -> Result<Self, ParseError> {
+		let name = parse::str_field(&sexp, "name").map(ToString::to_string);
+		let width = parse::nonzero_u8_field(&sexp, "width")?;
+		let endian = parse::endianness_field(&sexp, "endian")?.unwrap_or_default();
+
+		let mut variants = Vec::new();
+		let mut value = 0;
+		for field in sexp.to_ref_vec().unwrap_or_default() {
+			let (kind, name, disc) = match (field.get(0), field.get(1), field.get(2)) {
+				(Some(Value::Symbol(kind)), Some(Value::String(name)), Some(disc)) => {
+					(kind, name, Some(disc))
+				}
+				(Some(Value::Symbol(kind)), Some(Value::String(name)), None) => (kind, name, None),
+				_ => continue,
+			};
+
+			if kind.as_ref() != "variant" {
+				continue;
+			}
+
+			if let Some(d) = disc {
+				value = d.as_u64().ok_or(ParseError::EnumDiscriminantNaN)?;
+			}
+
+			variants.push(Variant {
+				name: name.to_string(),
+				value,
+			});
+
+			value += 1;
+		}
+
+		Ok(Self {
+			name,
+			width,
+			endian,
+			variants,
+		})
 	}
 }

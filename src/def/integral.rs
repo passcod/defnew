@@ -1,6 +1,7 @@
 use super::{
 	alignment::{Alignable, Alignment},
 	layout::{CowDef, Layable, Layout},
+	parse::{self, Parse, ParseError},
 	sexp_pair, ByteWidth, Def, Endianness,
 };
 use lexpr::Value;
@@ -42,5 +43,19 @@ impl From<Integral> for Value {
 			sexp_pair(Self::symbol("endian"), native.endian),
 			sexp_pair(Self::symbol("width"), native.width.get()),
 		])
+	}
+}
+
+impl Parse for Integral {
+	fn from_sexp(sexp: &Value) -> Result<Self, ParseError> {
+		let signed = parse::required("signed", parse::bool_field(&sexp, "signed"))?;
+		let endian = parse::endianness_field(&sexp, "endian")?.unwrap_or_default();
+		let width = parse::required("width", parse::nonzero_u8_field(&sexp, "width")?)?;
+
+		Ok(Self {
+			signed,
+			endian,
+			width,
+		})
 	}
 }

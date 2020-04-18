@@ -1,6 +1,7 @@
 use super::{
 	alignment::{Alignable, Alignment},
 	layout::{CowDef, Layable, Layout},
+	parse::{self, Parse, ParseError},
 	sexp_pair, Def,
 };
 use lexpr::Value;
@@ -30,7 +31,7 @@ pub struct Union {
 
 impl Alignable for Union {
 	fn align(&self) -> Alignment {
-		let max_align_of_variants = self
+		let mut max_align_of_variants = self
 			.alterns
 			.iter()
 			.map(|a| a.def.align())
@@ -38,10 +39,10 @@ impl Alignable for Union {
 			.unwrap_or_default();
 
 		if let Some(custom_align) = self.align {
-			max_align_of_variants.max(custom_align)
-		} else {
-			max_align_of_variants
+			max_align_of_variants.increase_to(custom_align);
 		}
+
+		max_align_of_variants
 	}
 }
 
@@ -56,6 +57,7 @@ impl Layable for Union {
 
 		let mut layout = Layout::default();
 		layout.append_with_size(CowDef::Owned(self.clone().into()), max_size_of_variants * 8);
+		layout.pad_to_align(self.align());
 		layout
 	}
 }
@@ -83,5 +85,37 @@ impl From<Union> for Value {
 		}
 
 		Self::list(def)
+	}
+}
+
+impl Parse for Union {
+	fn from_sexp(sexp: &Value) -> Result<Self, ParseError> {
+		let name = parse::str_field(&sexp, "name").map(ToString::to_string);
+		let align = parse::alignment_field(&sexp, "align")?;
+
+		let mut alterns = Vec::new();
+		for field in sexp.to_ref_vec().unwrap_or_default() {
+			let (kind, name, def) = match (field.get(0), field.get(1), field.get(2)) {
+				(Some(Value::Symbol(kind)), Some(Value::String(name)), Some(def)) => {
+					(kind, name, def)
+				}
+				_ => continue,
+			};
+
+			if kind.as_ref() != "altern" {
+				continue;
+			}
+
+			alterns.push(Altern {
+				name: name.to_string(),
+				def: Def::from_sexp(def)?,
+			});
+		}
+
+		Ok(Self {
+			name,
+			align,
+			alterns,
+		})
 	}
 }

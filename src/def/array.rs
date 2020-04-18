@@ -1,6 +1,7 @@
 use super::{
 	alignment::{Alignable, Alignment},
 	layout::{CowDef, Layable, Layout},
+	parse::{self, Parse, ParseError},
 	sexp_pair, Def,
 };
 use lexpr::Value;
@@ -75,5 +76,26 @@ impl From<Array> for Value {
 		def.push((*native.def).into());
 
 		Self::list(def)
+	}
+}
+
+impl Parse for Array {
+	fn from_sexp(sexp: &Value) -> Result<Self, ParseError> {
+		let name = parse::str_field(&sexp, "name").map(ToString::to_string);
+		let length = parse::required("length", parse::nonzero_u64_field(&sexp, "length")?)?;
+		let stride = parse::nonzero_u64_field(&sexp, "stride")?;
+
+		let def = sexp
+			.to_ref_vec()
+			.and_then(|mut v| v.pop())
+			.ok_or(ParseError::EmptyList)
+			.and_then(Def::from_sexp)?;
+
+		Ok(Self {
+			name,
+			length,
+			stride,
+			def: Box::new(def),
+		})
 	}
 }

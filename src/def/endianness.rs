@@ -1,4 +1,6 @@
 use lexpr::Value;
+use std::str::FromStr;
+use thiserror::Error;
 
 #[derive(Clone, Copy, Debug)]
 pub enum Endianness {
@@ -22,3 +24,20 @@ impl From<Endianness> for Value {
 		})
 	}
 }
+
+impl FromStr for Endianness {
+	type Err = InvalidEndiannessError;
+
+	fn from_str(s: &str) -> Result<Self, Self::Err> {
+		match s {
+			"big" => Ok(Self::Big),
+			"little" => Ok(Self::Little),
+			"native" => Ok(Self::Native),
+			endian => Err(InvalidEndiannessError(endian.to_string())),
+		}
+	}
+}
+
+#[derive(Debug, Error)]
+#[error("invalid endian specifier: {0} (expected one of: big, little, native)")]
+pub struct InvalidEndiannessError(String);

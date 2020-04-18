@@ -42,7 +42,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 		let def = lib::platform::parse_native_type(typestr)
 			.or_else(|| todo!("parse from s-exp"))
 			.unwrap();
-			// FIXME: also parse with "name" re-attached in case the : was internal to the type
+		// FIXME: also parse with "name" re-attached in case the : was internal to the type
 
 		fields.push(if let Some(name) = name {
 			lib::def::r#struct::Field::named(name, def)
@@ -63,6 +63,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 		eprint!("{}", def.layout());
 	}
 
-	println!("{}", Value::from(def));
+	let sexp = format!("{}", Value::from(def));
+	println!("{}", sexp);
+
+	let reparsed: lib::def::Def = sexp.parse()?;
+	dbg!(reparsed);
+
+	let parsed: lib::def::Def = r#"(padding
+		8
+	)"#
+	.parse()?;
+	dbg!(&parsed);
+
+	let resexped = Value::from(parsed);
+	println!("{}", resexped);
+
 	Ok(())
 }

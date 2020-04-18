@@ -1,6 +1,7 @@
 use super::{
 	alignment::{Alignable, Alignment},
 	layout::{CowDef, Layable, Layout},
+	parse::{self, Parse, ParseError},
 	sexp_pair, ByteWidth, Def,
 };
 use lexpr::Value;
@@ -39,10 +40,12 @@ pub struct Boolean {
 	// pub false_pattern: Option<BitPattern>,
 }
 
+const ONE_BYTE: ByteWidth = unsafe { ByteWidth::new_unchecked(1) };
+
 impl Default for Boolean {
 	fn default() -> Self {
 		Self {
-			width: unsafe { ByteWidth::new_unchecked(1) },
+			width: ONE_BYTE,
 			// true_pattern: None,
 			// false_pattern: None,
 		}
@@ -88,5 +91,13 @@ impl From<Boolean> for Value {
 		// }
 
 		Self::list(def)
+	}
+}
+
+impl Parse for Boolean {
+	fn from_sexp(sexp: &Value) -> Result<Self, ParseError> {
+		let width = parse::nonzero_u8_field(&sexp, "width")?.unwrap_or(ONE_BYTE);
+
+		Ok(Self { width })
 	}
 }

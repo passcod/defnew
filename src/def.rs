@@ -1,7 +1,11 @@
 use alignment::Alignable;
 use layout::{Layable, Layout};
 use lexpr::Value;
-use std::num::{NonZeroU64, NonZeroU8};
+use parse::Parse;
+use std::{
+	num::{NonZeroU64, NonZeroU8},
+	str::FromStr,
+};
 
 pub use alignment::Alignment;
 pub use array::Array;
@@ -22,6 +26,7 @@ pub mod r#enum;
 pub mod float;
 pub mod integral;
 pub mod layout;
+pub mod parse;
 pub mod pointer;
 pub mod r#struct;
 pub mod r#union;
@@ -50,8 +55,6 @@ pub enum Def {
 	Struct(Struct),
 	Enum(Enum),
 	Union(Union),
-
-	// complex:
 	Array(Array),
 
 	// special:
@@ -69,7 +72,6 @@ impl Alignable for Def {
 			Def::Struct(s) => s.align(),
 			Def::Enum(e) => e.align(),
 			Def::Union(u) => u.align(),
-
 			Def::Array(a) => a.align(),
 
 			Def::Pointer(p) => p.align(),
@@ -91,7 +93,6 @@ impl Layable for Def {
 			Def::Struct(s) => s.layout(),
 			Def::Enum(e) => e.layout(),
 			Def::Union(u) => u.layout(),
-
 			Def::Array(a) => a.layout(),
 
 			Def::Pointer(p) => p.layout(),
@@ -110,12 +111,22 @@ impl From<Def> for Value {
 			Def::Boolean(native) => native.into(),
 			Def::Integral(native) => native.into(),
 			Def::Float(native) => native.into(),
+
 			Def::Struct(native) => native.into(),
 			Def::Enum(native) => native.into(),
 			Def::Union(native) => native.into(),
 			Def::Array(native) => native.into(),
+
 			Def::Padding(bits) => Self::list(vec![Self::symbol("padding"), bits.get().into()]),
-			Def::Pointer(ptr) => Self::list(vec![Self::symbol("pointer"), ptr.into()]),
+			Def::Pointer(native) => native.into(),
 		}
+	}
+}
+
+impl FromStr for Def {
+	type Err = parse::ParseError;
+
+	fn from_str(s: &str) -> Result<Self, Self::Err> {
+		Self::from_sexp(&lexpr::from_str(s)?)
 	}
 }

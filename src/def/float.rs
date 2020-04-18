@@ -1,9 +1,12 @@
 use super::{
 	alignment::{Alignable, Alignment},
 	layout::{CowDef, Layable, Layout},
+	parse::{self, Parse, ParseError},
 	sexp_pair, Def, Endianness,
 };
 use lexpr::Value;
+use std::str::FromStr;
+use thiserror::Error;
 
 #[derive(Clone, Copy, Debug)]
 pub enum Format {
@@ -31,6 +34,28 @@ impl From<Format> for Value {
 		})
 	}
 }
+
+impl FromStr for Format {
+	type Err = InvalidFloatFormatError;
+
+	fn from_str(s: &str) -> Result<Self, Self::Err> {
+		Ok(match s {
+			"binary-16" => Format::Binary16,
+			"binary-32" => Format::Binary32,
+			"binary-64" => Format::Binary64,
+			"binary-128" => Format::Binary128,
+			"binary-256" => Format::Binary256,
+			"decimal-32" => Format::Decimal32,
+			"decimal-64" => Format::Decimal64,
+			"decimal-128" => Format::Decimal128,
+			format => return Err(InvalidFloatFormatError(format.into())),
+		})
+	}
+}
+
+#[derive(Debug, Error)]
+#[error("invalid float format specifier: {0} (expected one of: binary{{16,32,64,128,256}}, decimal{{32,64,128}})")]
+pub struct InvalidFloatFormatError(String);
 
 #[derive(Clone, Copy, Debug)]
 pub struct Float {
@@ -86,5 +111,19 @@ impl From<Float> for Value {
 		}
 
 		Self::list(def)
+	}
+}
+
+impl Parse for Float {
+	fn from_sexp(sexp: &Value) -> Result<Self, ParseError> {
+		let endian = parse::endianness_field(&sexp, "endian")?.unwrap_or_default();
+		let align = parse::alignment_field(&sexp, "align")?;
+		let format = parse::required("format", parse::sym_field(&sexp, "format"))?.parse()?;
+
+		Ok(Self {
+			format,
+			endian,
+			align,
+		})
 	}
 }
