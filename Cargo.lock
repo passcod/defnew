@@ -51,6 +51,7 @@ dependencies = [
 name = "defnew"
 version = "0.1.0"
 dependencies = [
+ "cfg-if",
  "lexpr",
  "log",
  "structopt",
