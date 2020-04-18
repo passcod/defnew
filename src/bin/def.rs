@@ -24,52 +24,39 @@ struct Args {
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
 	let args = Args::from_args();
-	dbg!(&args);
+
+	let mut fields = Vec::with_capacity(args.raw.len());
+
+	for arg in args.raw {
+		let parts: Vec<&str> = arg.splitn(2, ":").collect();
+		let (name, typestr) = match *parts {
+			[typestr] => (None, typestr),
+			[name, typestr] => (Some(name), typestr),
+			_ => unreachable!(),
+		};
+
+		let def = lib::platform::parse_native_type(typestr)
+			.or_else(|| todo!("parse from s-exp"))
+			.unwrap();
+
+		fields.push(if let Some(name) = name {
+			lib::def::r#struct::Field::named(name, def)
+		} else {
+			lib::def::r#struct::Field::anonymous(def)
+		});
+	}
 
 	let def = lib::Def::Struct(lib::def::Struct {
 		name: args.name,
 		align: args.align,
 		packed: args.packed,
-		fields: vec![
-			lib::def::r#struct::Field::anonymous(lib::def::Boolean {
-				width: std::num::NonZeroU8::new(2).unwrap(),
-				true_pattern: None,
-				false_pattern: None,
-			}),
-			lib::def::r#struct::Field::anonymous(lib::def::Array::anonymous(
-				lib::def::Boolean::default().into(),
-				unsafe { std::num::NonZeroU64::new_unchecked(3) },
-			)),
-		],
+		fields,
 	});
-
-	dbg!(&def);
 
 	use lib::def::layout::Layable;
 	let layout = def.layout();
-	dbg!(&layout);
-	use lib::def::alignment::Alignable;
-	dbg!(&def.align());
 
-	#[repr(C, packed(1))]
-	struct Example {
-		a: u16,
-		b: [u8; 3],
-	}
-
-	dbg!(std::mem::size_of::<Example>());
-	dbg!(std::mem::align_of::<Example>());
-
-	let example = Example {
-		a: 0b1111_1111_1111_1111,
-		b: [0xAA, 0xBB, 0xCC],
-	};
-
-	let example_bytes: [u8; std::mem::size_of::<Example>()] =
-		unsafe { std::mem::transmute(example) };
-	println!("{:x?}", example_bytes);
-
-	println!("layout:\n{}", layout);
+	println!("{}", layout);
 	println!("{}", Value::from(def));
 
 	Ok(())
