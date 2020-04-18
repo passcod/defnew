@@ -5,44 +5,46 @@ use super::{
 };
 use lexpr::Value;
 
-#[derive(Clone, Copy, Debug)]
-pub enum Bit {
-	One,
-	Zero,
-	Undef,
-}
+// TODO: reconsider bit patterns
+//
+// #[derive(Clone, Copy, Debug)]
+// pub enum Bit {
+// 	One,
+// 	Zero,
+// 	Undef,
+// }
 
-#[derive(Clone, Debug)]
-pub struct BitPattern(pub Vec<Bit>);
+// #[derive(Clone, Debug)]
+// pub struct BitPattern(pub Vec<Bit>);
 
-impl From<BitPattern> for Value {
-	fn from(native: BitPattern) -> Self {
-		let pat: String = native
-			.0
-			.iter()
-			.map(|bit| match bit {
-				Bit::One => '1',
-				Bit::Zero => '0',
-				Bit::Undef => 'U',
-			})
-			.collect();
-		Self::string(pat)
-	}
-}
+// impl From<BitPattern> for Value {
+// 	fn from(native: BitPattern) -> Self {
+// 		let pat: String = native
+// 			.0
+// 			.iter()
+// 			.map(|bit| match bit {
+// 				Bit::One => '1',
+// 				Bit::Zero => '0',
+// 				Bit::Undef => '_',
+// 			})
+// 			.collect();
+// 		Self::string(pat)
+// 	}
+// }
 
 #[derive(Clone, Debug)]
 pub struct Boolean {
 	pub width: ByteWidth,
-	pub true_pattern: Option<BitPattern>,
-	pub false_pattern: Option<BitPattern>,
+	// pub true_pattern: Option<BitPattern>,
+	// pub false_pattern: Option<BitPattern>,
 }
 
 impl Default for Boolean {
 	fn default() -> Self {
 		Self {
 			width: unsafe { ByteWidth::new_unchecked(1) },
-			true_pattern: None,
-			false_pattern: None,
+			// true_pattern: None,
+			// false_pattern: None,
 		}
 	}
 }
@@ -77,13 +79,13 @@ impl From<Boolean> for Value {
 			def.push(sexp_pair(Self::symbol("width"), native.width.get()));
 		}
 
-		if let Some(pattern) = native.true_pattern {
-			def.push(sexp_pair(Self::symbol("true-pattern"), pattern));
-		}
+		// if let Some(pattern) = native.true_pattern {
+		// 	def.push(sexp_pair(Self::symbol("true-pattern"), pattern));
+		// }
 
-		if let Some(pattern) = native.false_pattern {
-			def.push(sexp_pair(Self::symbol("false-pattern"), pattern));
-		}
+		// if let Some(pattern) = native.false_pattern {
+		// 	def.push(sexp_pair(Self::symbol("false-pattern"), pattern));
+		// }
 
 		Self::list(def)
 	}
