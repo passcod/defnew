@@ -1,5 +1,7 @@
 use crate::def::{self, Boolean, ByteWidth, Def, Endianness, Float, Integral};
 
+pub const POINTER_WIDTH: u8 = 8;
+
 pub fn parse_type(typestr: &str) -> Option<Def> {
 	Some(match typestr {
 		"usize" => u64(),
