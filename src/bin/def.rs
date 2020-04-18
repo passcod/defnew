@@ -5,6 +5,10 @@ use structopt::StructOpt;
 /// def constructs normalised s-exp defs from arguments
 #[derive(Debug, StructOpt)]
 struct Args {
+	/// Print the layout to stderr
+	#[structopt(long = "show-layout")]
+	show_layout: bool,
+
 	/// Name the outer structure
 	#[structopt(long)]
 	name: Option<String>,
@@ -38,6 +42,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 		let def = lib::platform::parse_native_type(typestr)
 			.or_else(|| todo!("parse from s-exp"))
 			.unwrap();
+			// FIXME: also parse with "name" re-attached in case the : was internal to the type
 
 		fields.push(if let Some(name) = name {
 			lib::def::r#struct::Field::named(name, def)
@@ -53,11 +58,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 		fields,
 	});
 
-	use lib::def::layout::Layable;
-	let layout = def.layout();
+	if args.show_layout {
+		use lib::def::layout::Layable;
+		eprint!("{}", def.layout());
+	}
 
-	println!("{}", layout);
 	println!("{}", Value::from(def));
-
 	Ok(())
 }
