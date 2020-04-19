@@ -1,5 +1,6 @@
 use crate::def::{self, Boolean, ByteWidth, Def, Endianness, Float, Integral};
 
+pub const ENDIAN: Endianness = Endianness::Little;
 pub const POINTER_WIDTH: u8 = 8;
 
 pub fn parse_type(typestr: &str) -> Option<Def> {
