@@ -2,7 +2,7 @@
 name = "defnew"
 version = "0.1.0"
 authors = ["Félix Saparelli <felix@passcod.name>"]
-homepage = "https://github.com/passcod/refnew"
+homepage = "https://github.com/passcod/defnew"
 license = "CC-BY-NC-SA-4.0"
 edition = "2018"
 
