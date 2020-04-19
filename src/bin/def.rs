@@ -19,7 +19,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 		.help("Specifies endianness");
 
 	let args = App::new("defnew")
-		.author(clap::crate_authors!())
+		.author(env!("CARGO_PKG_HOMEPAGE"))
 		.about("def: constructs, normalises, and lays out defs")
 		.version(clap::crate_version!())
 		.setting(AppSettings::AllowExternalSubcommands)
