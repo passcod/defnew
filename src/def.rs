@@ -62,6 +62,31 @@ pub enum Def {
 	Padding(BitWidth),
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum Family {
+	Scalar,
+	Structural,
+	Special,
+}
+
+impl Def {
+	pub fn family(&self) -> Family {
+		match self {
+			Def::Boolean(_) => Family::Scalar,
+			Def::Integral(_) => Family::Scalar,
+			Def::Float(_) => Family::Scalar,
+
+			Def::Struct(_) => Family::Structural,
+			Def::Enum(_) => Family::Structural,
+			Def::Union(_) => Family::Structural,
+			Def::Array(_) => Family::Structural,
+
+			Def::Pointer(_) => Family::Special,
+			Def::Padding(_) => Family::Special,
+		}
+	}
+}
+
 impl Alignable for Def {
 	fn align(&self) -> Alignment {
 		match self {

@@ -32,6 +32,8 @@ pub struct Enum {
 	pub variants: Vec<Variant>,
 }
 
+// TODO: check that variant names are unique on create
+
 impl Enum {
 	fn true_width(&self) -> u64 {
 		let max_value = self.variants.iter().map(|v| v.value).max().unwrap_or(0);

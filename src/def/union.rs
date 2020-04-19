@@ -29,6 +29,8 @@ pub struct Union {
 	pub alterns: Vec<Altern>,
 }
 
+// TODO: check that altern names are unique on create
+
 impl Alignable for Union {
 	fn align(&self) -> Alignment {
 		let mut max_align_of_variants = self

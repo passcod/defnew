@@ -14,6 +14,7 @@ pub type CowDef<'def> = Cow<'def, Def>;
 
 #[derive(Clone, Debug)]
 pub struct Lay<'def> {
+	pub name: Option<String>,
 	pub def: CowDef<'def>,
 	pub offset: Bits,
 	pub size: Bits,
@@ -26,16 +27,23 @@ pub struct Layout<'def> {
 }
 
 impl<'def> Layout<'def> {
-	pub fn append_with_size(&mut self, def: CowDef<'def>, size: Bits) {
+	pub fn append_with_size_and_name(
+		&mut self,
+		name: Option<String>,
+		def: CowDef<'def>,
+		size: Bits,
+	) {
 		trace!(
-			"{:03} -> {:03}  = {:3}   [{:?}]",
+			"{:03} -> {:03}  = {:3}   ({:?}) [{:?}]",
 			self.size,
 			self.size + size,
 			size,
+			&name,
 			&def
 		);
 
 		self.lays.push(Lay {
+			name,
 			def,
 			offset: self.size,
 			size,
@@ -43,9 +51,17 @@ impl<'def> Layout<'def> {
 		self.size += size;
 	}
 
-	pub fn append(&mut self, def: CowDef<'def>) {
+	pub fn append_with_size(&mut self, def: CowDef<'def>, size: Bits) {
+		self.append_with_size_and_name(None, def, size);
+	}
+
+	pub fn append_with_name(&mut self, name: Option<String>, def: CowDef<'def>) {
 		let size = def.layout().size;
-		self.append_with_size(def, size);
+		self.append_with_size_and_name(name, def, size);
+	}
+
+	pub fn append(&mut self, def: CowDef<'def>) {
+		self.append_with_name(None, def);
 	}
 
 	pub fn pad(&mut self, bits: impl Into<Bits>) {

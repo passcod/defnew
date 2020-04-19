@@ -51,6 +51,8 @@ pub struct Struct {
 	pub fields: Vec<Field>,
 }
 
+// TODO: check that field names are unique on create
+
 impl Alignable for Struct {
 	fn align(&self) -> Alignment {
 		let mut align = Alignment::default();
@@ -103,7 +105,11 @@ impl Layable for Struct {
 			// The offset for the field is what the current offset is now.
 			// Then increase the current offset by the size of the field.
 			trace!("field: {:?}", field);
-			layout.append_with_size(CowDef::Borrowed(&field.def), field_size);
+			layout.append_with_size_and_name(
+				field.name.clone(),
+				CowDef::Borrowed(&field.def),
+				field_size,
+			);
 		}
 
 		// Finally, the size of the struct is the current offset rounded up
