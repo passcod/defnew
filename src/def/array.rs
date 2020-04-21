@@ -7,7 +7,7 @@ use super::{
 use lexpr::Value;
 use std::num::NonZeroU64;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Hash)]
 pub struct Array {
 	pub name: Option<String>,
 	pub length: NonZeroU64,

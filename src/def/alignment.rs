@@ -13,7 +13,7 @@ pub trait Alignable {
 // "The alignment value must be a power of two from 1 up to 2^29."
 // https://doc.rust-lang.org/stable/reference/type-layout.html#the-alignment-modifiers
 
-#[derive(Clone, Copy, Debug, PartialOrd, PartialEq, Eq, Ord)]
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialOrd, PartialEq)]
 pub struct Alignment(pub NonZeroU64);
 
 impl Alignment {

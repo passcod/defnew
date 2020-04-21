@@ -1,5 +1,6 @@
 use super::{
 	alignment::{Alignable, Alignment},
+	fillable::{FillError, Fillable},
 	layout::{CowDef, Layable, Layout},
 	parse::{self, Parse, ParseError},
 	sexp_pair, ByteWidth, Def,
@@ -33,7 +34,7 @@ use lexpr::Value;
 // 	}
 // }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Hash)]
 pub struct Boolean {
 	pub width: ByteWidth,
 	// pub true_pattern: Option<BitPattern>,
@@ -65,6 +66,15 @@ impl Layable for Boolean {
 		let mut layout = Layout::default();
 		layout.append_with_size(CowDef::Owned(self.clone().into()), size * 8);
 		layout
+	}
+}
+
+impl Fillable for Boolean {
+	fn fill_from_str(&self, s: &str) -> Result<Vec<u8>, FillError> {
+		Ok(vec![match s.to_ascii_lowercase().as_str() {
+			"true" | "1" => 1,
+			_ => 0,
+		}])
 	}
 }
 

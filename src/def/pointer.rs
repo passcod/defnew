@@ -1,14 +1,15 @@
 use super::{
 	alignment::{Alignable, Alignment},
+	fillable::{FillError, Fillable},
 	layout::{CowDef, Layable, Layout},
 	parse::{self, Parse, ParseError},
-	sexp_pair, ByteWidth, Def, Endianness,
+	sexp_pair, ByteWidth, Def, Endianness, Integral,
 };
 use lexpr::Value;
 use std::{fmt, str::FromStr};
 use thiserror::Error;
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Hash)]
 pub enum Context {
 	Local,
 	Remote,
@@ -55,7 +56,7 @@ impl FromStr for Context {
 #[error("pointer context may be local or remote")]
 pub struct InvalidContextError;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Hash)]
 pub struct Pointer {
 	pub endian: Endianness,
 	pub width: ByteWidth,
@@ -76,6 +77,17 @@ impl Layable for Pointer {
 		let mut layout = Layout::default();
 		layout.append_with_size(CowDef::Owned(self.clone().into()), size * 8);
 		layout
+	}
+}
+
+impl Fillable for Pointer {
+	fn fill_from_str(&self, s: &str) -> Result<Vec<u8>, FillError> {
+		Integral {
+			signed: false,
+			endian: self.endian,
+			width: self.width,
+		}
+		.fill_from_str(s)
 	}
 }
 

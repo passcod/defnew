@@ -1,14 +1,15 @@
 use super::{
 	alignment::{Alignable, Alignment},
 	div_round_up,
+	fillable::{FillError, Fillable},
 	layout::{CowDef, Layable, Layout},
 	parse::{self, Parse, ParseError},
-	sexp_pair, ByteWidth, Def, Endianness,
+	sexp_pair, ByteWidth, Def, Endianness, Integral,
 };
 use lexpr::Value;
-use std::convert::TryFrom;
+use std::convert::{TryFrom, TryInto};
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Hash)]
 pub struct Variant {
 	pub name: String,
 	pub value: u64,
@@ -24,7 +25,7 @@ impl From<Variant> for Value {
 	}
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Hash)]
 pub struct Enum {
 	pub name: Option<String>,
 	pub width: Option<ByteWidth>,
@@ -57,6 +58,37 @@ impl Layable for Enum {
 		let mut layout = Layout::default();
 		layout.append_with_size(CowDef::Owned(self.clone().into()), self.true_width() * 8);
 		layout
+	}
+}
+
+impl Fillable for Enum {
+	fn fill_from_str(&self, s: &str) -> Result<Vec<u8>, FillError> {
+		let value = self
+			.variants
+			.iter()
+			.find_map(|variant| {
+				if &variant.name == s {
+					Some(variant.value)
+				} else {
+					None
+				}
+			})
+			.ok_or(FillError::UnknownVariant)?;
+
+		if let Some(width) = ByteWidth::new(
+			self.true_width()
+				.try_into()
+				.unwrap_or_else(|_| todo!("enums larger than a 256 bits")),
+		) {
+			Integral {
+				signed: false,
+				endian: self.endian,
+				width,
+			}
+			.fill_from_str(&value.to_string())
+		} else {
+			Ok(Vec::new())
+		}
 	}
 }
 

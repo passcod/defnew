@@ -2,7 +2,7 @@ use lexpr::Value;
 use std::str::FromStr;
 use thiserror::Error;
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Hash)]
 pub enum Endianness {
 	Big,
 	Little,

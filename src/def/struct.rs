@@ -7,7 +7,7 @@ use super::{
 use lexpr::Value;
 use log::trace;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Hash)]
 pub struct Field {
 	pub name: Option<String>,
 	pub def: Def,
@@ -43,7 +43,7 @@ impl From<Field> for Value {
 	}
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Hash)]
 pub struct Struct {
 	pub name: Option<String>,
 	pub packed: Option<Alignment>,

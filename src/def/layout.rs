@@ -1,7 +1,18 @@
 use super::Alignment;
-use super::{BitWidth, Def};
+use super::{
+	div_round_up,
+	fillable::{FillError, Fillable},
+	BitWidth, Def, Family,
+};
 use log::trace;
-use std::{borrow::Cow, convert::TryInto, fmt, num::NonZeroU8};
+use std::{
+	borrow::Cow,
+	collections::HashMap,
+	convert::{TryFrom, TryInto},
+	fmt,
+	io::{Cursor, Write},
+	num::NonZeroU8,
+};
 use thiserror::Error;
 
 pub trait Layable {
@@ -12,12 +23,59 @@ type Bits = u64;
 
 pub type CowDef<'def> = Cow<'def, Def>;
 
-#[derive(Clone, Debug)]
+#[derive(Debug, Hash)]
 pub struct Lay<'def> {
 	pub name: Option<String>,
 	pub def: CowDef<'def>,
 	pub offset: Bits,
 	pub size: Bits,
+	unique: usize,
+}
+
+const SIZE_OF_LAY: &'static str = "size of lay does not fit in usize";
+
+impl<'def> Lay<'def> {
+	pub fn unique() -> usize {
+		use std::sync::atomic::{AtomicUsize, Ordering};
+		static IOTA: AtomicUsize = AtomicUsize::new(0);
+		IOTA.fetch_add(1, Ordering::SeqCst)
+	}
+
+	pub fn new(
+		name: Option<impl Into<String>>,
+		def: CowDef<'def>,
+		offset: Bits,
+		size: Bits,
+	) -> Self {
+		Self {
+			name: name.map(|s| s.into()),
+			def,
+			offset,
+			size,
+			unique: Self::unique(),
+		}
+	}
+
+	pub fn fill_from_str(&self, s: &str) -> Result<Vec<u8>, FillError> {
+		self.def.fill_from_str(s)
+		// vec![0xFF; usize::try_from(div_round_up(self.size, 8)).expect(SIZE_OF_LAY)]
+	}
+
+	pub fn fill_as_zero(&self) -> Vec<u8> {
+		vec![0; usize::try_from(div_round_up(self.size, 8)).expect(SIZE_OF_LAY)]
+	}
+}
+
+impl<'def> Clone for Lay<'def> {
+	fn clone(&self) -> Self {
+		Self {
+			name: self.name.clone(),
+			def: self.def.clone(),
+			offset: self.offset,
+			size: self.size,
+			unique: Self::unique(),
+		}
+	}
 }
 
 #[derive(Clone, Debug, Default)]
@@ -27,6 +85,113 @@ pub struct Layout<'def> {
 }
 
 impl<'def> Layout<'def> {
+	// fn(abs, parents: vec<(lay, name)>, lay, name)
+	pub fn fold<T>(
+		&self,
+		with_padding: bool,
+		op: impl FnMut(&mut usize, &[&(&Lay, String)], &Lay, &str) -> Option<T>,
+	) -> Vec<T> {
+		self.fold_impl(&mut 0, &[], with_padding, op).0
+	}
+
+	// TODO: this entire thing (and its uses) probably needs a good rethink/refactor
+	fn fold_impl<T, F>(
+		&self,
+		abs: &mut usize,
+		parents: &[&(&Lay, String)],
+		with_padding: bool,
+		mut op: F,
+	) -> (Vec<T>, F)
+	where
+		F: FnMut(&mut usize, &[&(&Lay, String)], &Lay, &str) -> Option<T>,
+	{
+		let it: Vec<(usize, &Lay)> = if with_padding {
+			self.lays.iter().enumerate().collect()
+		} else {
+			self.lays
+				.iter()
+				.filter(|lay| !matches!(lay.def.as_ref(), &Def::Padding(_)))
+				.enumerate()
+				.collect()
+		};
+
+		let mut laundry = Vec::new();
+		for (rel, lay) in it {
+			let name = lay.name.clone().unwrap_or(rel.to_string());
+
+			if let Some(item) = op(abs, parents, lay, &name) {
+				laundry.push(item);
+			}
+
+			*abs += 1;
+
+			if let Family::Structural = lay.def.family() {
+				let mut ps = Vec::new();
+				ps.extend(parents);
+				let this = (lay, name);
+				ps.push(&this);
+
+				let (extra, f) = lay.def.layout().fold_impl(abs, &ps, with_padding, op);
+				op = f; // this is a hack to avoid infinite types
+				laundry.extend(extra);
+			}
+		}
+
+		(laundry, op)
+	}
+
+	pub fn fill(
+		&self,
+		positional: impl IntoIterator<Item = String>,
+		keyed: HashMap<Vec<String>, String>,
+	) -> Result<Vec<u8>, FillError> {
+		let mut positional = positional.into_iter();
+
+		// Vec<(bytes, size in bits)>
+		let fields = self
+			.fold(true, |_, parents, lay, name| {
+				let mut key = parents
+					.iter()
+					.map(|(_, name)| name.clone())
+					.collect::<Vec<String>>();
+				key.push(name.into());
+
+				let size = if lay.size % 8 == 0 {
+					usize::try_from(lay.size).expect(SIZE_OF_LAY)
+				} else {
+					todo!("partial-byte lay fills")
+				};
+
+				Some(if let Family::Structural = lay.def.family() {
+					return None;
+				} else if let Def::Padding(_) = lay.def.as_ref() {
+					Ok((lay.fill_as_zero(), size))
+				} else if let Some(value) = keyed.get(&key) {
+					lay.fill_from_str(&value).map(|v| (v, size))
+				} else if let Some(value) = positional.next() {
+					lay.fill_from_str(&value).map(|v| (v, size))
+				} else {
+					Ok((lay.fill_as_zero(), size))
+				})
+			})
+			.into_iter()
+			.collect::<Result<Vec<_>, _>>()?;
+
+		let mut buf = Cursor::new(vec![
+			0;
+			div_round_up(
+				fields.iter().map(|(_, bits)| bits).sum(),
+				8
+			)
+		]);
+
+		for (bytes, _) in fields {
+			buf.write(&bytes).expect("failed to write to memory???");
+		}
+
+		Ok(buf.into_inner())
+	}
+
 	pub fn append_with_size_and_name(
 		&mut self,
 		name: Option<String>,
@@ -42,12 +207,7 @@ impl<'def> Layout<'def> {
 			&def
 		);
 
-		self.lays.push(Lay {
-			name,
-			def,
-			offset: self.size,
-			size,
-		});
+		self.lays.push(Lay::new(name, def, self.size, size));
 		self.size += size;
 	}
 

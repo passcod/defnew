@@ -9,7 +9,11 @@ use defnew::{
 	},
 	platform,
 };
-use std::str::FromStr;
+use std::{
+	collections::HashMap,
+	io::{stdout, Write},
+	str::FromStr,
+};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
 	let args = App::new("defnew")
@@ -17,10 +21,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 		.about("new: given a def and some values (missing ones default to zeroed), outputs bytes")
 		.version(clap::crate_version!())
 		.arg(
-			Arg::with_name("show-paths")
-				.long("show-paths")
-				.short("P")
-				.help("Shows field paths for the def given"),
+			Arg::with_name("show-fields")
+				.long("show-fields")
+				.short("F")
+				.help("Shows field paths for the def given instead"),
 		)
 		.arg(
 			Arg::with_name("def")
@@ -51,25 +55,72 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 	let values = args.values_of("values").unwrap_or_default();
 
-	dbg!(&layout, &values);
+	if args.is_present("show-fields") {
+		eprintln!("[ARG]  {:<35}  DESCRIPTION", "STRUCTURAL PATH");
+		for (arg, path, desc) in show_fields(&layout) {
+			eprintln!(
+				"[{:>3}]  {:35}  {}",
+				arg.map_or(String::new(), |n| n.to_string()),
+				arg.map_or(String::new(), |_| path),
+				desc
+			);
+		}
 
-	show_fields("", &layout);
+		return Ok(());
+	}
+
+	let mut positional = Vec::new();
+	let mut keyed = HashMap::new();
+
+	for v in values {
+		match v.splitn(2, ":").collect::<Vec<&str>>().as_slice() {
+			[key, value] if key.parse::<usize>().is_ok() => positional.push((*value).into()),
+			[key, value] => {
+				keyed.insert(key_from_path(*key), (*value).into());
+			}
+			[value] => positional.push((*value).into()),
+			_ => unreachable!(),
+		}
+	}
+
+	let bytes = layout.fill(positional, keyed)?;
+
+	if cfg!(windows) {
+		todo!("printing raw bytes out is not supported on windows, so this tool cannot work as is. bytes in hex: {:02x?}", bytes);
+	}
+
+	stdout().write_all(&bytes)?;
 
 	Ok(())
 }
 
-fn show_fields(parent: &str, layout: &Layout) {
-	for (i, lay) in layout
-		.lays
-		.iter()
-		.filter(|lay| !matches!(lay.def.as_ref(), &Def::Padding(_)))
-		.enumerate()
-	{
-		let name = format!("{}{}", parent, lay.name.as_ref().unwrap_or(&i.to_string()));
-		println!("{:30}: {:?}", name, lay.def);
+fn show_fields(layout: &Layout) -> Vec<(Option<usize>, String, String)> {
+	layout.fold(false, |abs, parents, lay, name| {
+		let mut fullname = parents
+			.iter()
+			.map(|(_, name)| name.clone())
+			.collect::<Vec<String>>();
+		fullname.insert(0, "".into());
+		let fullname = fullname.join(".");
 
-		if let Family::Structural = lay.def.family() {
-			show_fields(&(name + "."), &lay.def.layout());
-		}
-	}
+		Some((
+			if let Family::Structural = lay.def.family() {
+				*abs -= 1;
+				None
+			} else {
+				Some(*abs)
+			},
+			format!("{}.{}", fullname, name),
+			format!("{:?}", lay.def)
+				.chars()
+				.take(120)
+				.collect::<String>(),
+		))
+	})
+}
+
+fn key_from_path(path: &str) -> Vec<String> {
+	path.split(".")
+		.filter_map(|k| if k.is_empty() { None } else { Some(k.into()) })
+		.collect()
 }

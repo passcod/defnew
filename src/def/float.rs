@@ -1,5 +1,6 @@
 use super::{
 	alignment::{Alignable, Alignment},
+	fillable::{FillError, Fillable},
 	layout::{CowDef, Layable, Layout},
 	parse::{self, Parse, ParseError},
 	sexp_pair, Def, Endianness,
@@ -8,7 +9,7 @@ use lexpr::Value;
 use std::str::FromStr;
 use thiserror::Error;
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Hash)]
 pub enum Format {
 	Binary16,
 	Binary32,
@@ -57,7 +58,7 @@ impl FromStr for Format {
 #[error("invalid float format specifier: {0} (expected one of: binary{{16,32,64,128,256}}, decimal{{32,64,128}})")]
 pub struct InvalidFloatFormatError(String);
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Hash)]
 pub struct Float {
 	pub format: Format,
 	pub endian: Endianness,
@@ -89,6 +90,27 @@ impl Layable for Float {
 		let mut layout = Layout::default();
 		layout.append_with_size(CowDef::Owned(self.clone().into()), size * 8);
 		layout
+	}
+}
+
+impl Fillable for Float {
+	fn fill_from_str(&self, s: &str) -> Result<Vec<u8>, FillError> {
+		macro_rules! filler {
+			($endian:expr, $numtype:ty, $s:expr) => {{
+				let num = <$numtype>::from_str($s)?;
+				match $endian {
+					Endianness::Big => num.to_be_bytes().to_vec(),
+					Endianness::Little => num.to_le_bytes().to_vec(),
+					Endianness::Native => num.to_ne_bytes().to_vec(),
+					}
+				}};
+		}
+
+		Ok(match self.format {
+			Format::Binary32 => filler!(self.endian, f32, s),
+			Format::Binary64 => filler!(self.endian, f64, s),
+			_ => todo!("fill for binary{{16,128,256}} and decimal floats"),
+		})
 	}
 }
 

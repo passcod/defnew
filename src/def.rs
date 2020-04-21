@@ -1,4 +1,5 @@
 use alignment::Alignable;
+use fillable::{FillError, Fillable};
 use layout::{Layable, Layout};
 use lexpr::Value;
 use parse::Parse;
@@ -23,6 +24,7 @@ pub mod array;
 pub mod boolean;
 pub mod endianness;
 pub mod r#enum;
+pub mod fillable;
 pub mod float;
 pub mod integral;
 pub mod layout;
@@ -38,23 +40,37 @@ pub(crate) fn sexp_pair(a: impl Into<Value>, b: impl Into<Value>) -> Value {
 	Value::list(vec![a.into(), b.into()])
 }
 
-pub(crate) fn div_round_up(value: u64, divisor: u64) -> u64 {
+pub(crate) fn div_round_up<T>(value: T, divisor: T) -> T
+where
+	T: std::ops::Div<Output = T>
+		+ std::ops::Rem<Output = T>
+		+ std::ops::Add<Output = T>
+		+ std::cmp::PartialOrd
+		+ From<u8>
+		+ Copy,
+{
 	let div = value / divisor;
 	let rem = value % divisor;
-	div + if rem > 0 { 1 } else { 0 }
+	div + if rem > T::from(0) {
+		T::from(1)
+	} else {
+		T::from(0)
+	}
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Hash)]
 pub enum Def {
 	// scalar:
 	Boolean(Boolean),
 	Integral(Integral),
 	Float(Float),
 
-	// structural:
-	Struct(Struct),
+	// shared:
 	Enum(Enum),
 	Union(Union),
+
+	// structural:
+	Struct(Struct),
 	Array(Array),
 
 	// special:
@@ -62,9 +78,10 @@ pub enum Def {
 	Padding(BitWidth),
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum Family {
 	Scalar,
+	Shared,
 	Structural,
 	Special,
 }
@@ -76,9 +93,10 @@ impl Def {
 			Def::Integral(_) => Family::Scalar,
 			Def::Float(_) => Family::Scalar,
 
+			Def::Enum(_) => Family::Shared,
+			Def::Union(_) => Family::Shared,
+
 			Def::Struct(_) => Family::Structural,
-			Def::Enum(_) => Family::Structural,
-			Def::Union(_) => Family::Structural,
 			Def::Array(_) => Family::Structural,
 
 			Def::Pointer(_) => Family::Special,
@@ -94,9 +112,10 @@ impl Alignable for Def {
 			Def::Integral(i) => i.align(),
 			Def::Float(f) => f.align(),
 
-			Def::Struct(s) => s.align(),
 			Def::Enum(e) => e.align(),
 			Def::Union(u) => u.align(),
+
+			Def::Struct(s) => s.align(),
 			Def::Array(a) => a.align(),
 
 			Def::Pointer(p) => p.align(),
@@ -115,9 +134,10 @@ impl Layable for Def {
 			Def::Integral(i) => i.layout(),
 			Def::Float(f) => f.layout(),
 
-			Def::Struct(s) => s.layout(),
 			Def::Enum(e) => e.layout(),
 			Def::Union(u) => u.layout(),
+
+			Def::Struct(s) => s.layout(),
 			Def::Array(a) => a.layout(),
 
 			Def::Pointer(p) => p.layout(),
@@ -130,6 +150,24 @@ impl Layable for Def {
 	}
 }
 
+impl Fillable for Def {
+	fn fill_from_str(&self, s: &str) -> Result<Vec<u8>, FillError> {
+		match self {
+			Def::Boolean(b) => b.fill_from_str(s),
+			Def::Integral(i) => i.fill_from_str(s),
+			Def::Float(f) => f.fill_from_str(s),
+
+			Def::Enum(e) => e.fill_from_str(s),
+			Def::Union(u) => u.fill_from_str(s),
+
+			Def::Pointer(p) => p.fill_from_str(s),
+			Def::Struct(_) | Def::Array(_) | Def::Padding(_) => {
+				unreachable!("structural or padding defs are not filled directly")
+			}
+		}
+	}
+}
+
 impl From<Def> for Value {
 	fn from(native: Def) -> Self {
 		match native {
@@ -137,9 +175,10 @@ impl From<Def> for Value {
 			Def::Integral(native) => native.into(),
 			Def::Float(native) => native.into(),
 
-			Def::Struct(native) => native.into(),
 			Def::Enum(native) => native.into(),
 			Def::Union(native) => native.into(),
+
+			Def::Struct(native) => native.into(),
 			Def::Array(native) => native.into(),
 
 			Def::Padding(bits) => Self::list(vec![Self::symbol("padding"), bits.get().into()]),

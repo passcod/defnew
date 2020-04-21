@@ -1,12 +1,14 @@
 use super::{
 	alignment::{Alignable, Alignment},
+	fillable::{FillError, Fillable},
 	layout::{CowDef, Layable, Layout},
 	parse::{self, Parse, ParseError},
 	sexp_pair, Def,
 };
 use lexpr::Value;
+use std::convert::TryFrom;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Hash)]
 pub struct Altern {
 	pub name: String,
 	pub def: Def,
@@ -22,11 +24,21 @@ impl From<Altern> for Value {
 	}
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Hash)]
 pub struct Union {
 	pub name: Option<String>,
 	pub align: Option<Alignment>,
 	pub alterns: Vec<Altern>,
+}
+
+impl Union {
+	pub fn max_size_of_variants(&self) -> u64 {
+		self.alterns
+			.iter()
+			.map(|a| a.def.layout().size)
+			.max()
+			.unwrap_or_default()
+	}
 }
 
 // TODO: check that altern names are unique on create
@@ -50,17 +62,42 @@ impl Alignable for Union {
 
 impl Layable for Union {
 	fn layout(&self) -> Layout {
-		let max_size_of_variants = self
-			.alterns
-			.iter()
-			.map(|a| a.def.layout().size)
-			.max()
-			.unwrap_or_default();
-
 		let mut layout = Layout::default();
-		layout.append_with_size(CowDef::Owned(self.clone().into()), max_size_of_variants * 8);
+		layout.append_with_size(
+			CowDef::Owned(self.clone().into()),
+			self.max_size_of_variants() * 8,
+		);
 		layout.pad_to_align(self.align());
 		layout
+	}
+}
+
+impl Fillable for Union {
+	fn fill_from_str(&self, s: &str) -> Result<Vec<u8>, FillError> {
+		let def = self
+			.alterns
+			.iter()
+			.find_map(|altern| {
+				if &altern.name == s {
+					Some(&altern.def)
+				} else {
+					None
+				}
+			})
+			.ok_or(FillError::UnknownAltern)?;
+
+		let mut bytes = def.layout().fill(vec![s.to_string()], Default::default())?;
+
+		// pad to union size
+		let max_size = usize::try_from(self.max_size_of_variants())
+			.expect("size of union does not fit in usize");
+		if max_size % 8 == 0 {
+			bytes.extend(vec![0; max_size / 8 - bytes.len()]);
+		} else {
+			todo!("fill for unions with non-aligned alterns");
+		}
+
+		Ok(bytes)
 	}
 }
 
