@@ -89,9 +89,9 @@ impl<'def> Layout<'def> {
 	pub fn fold<T>(
 		&self,
 		with_padding: bool,
-		op: impl FnMut(&mut usize, &[&(&Lay, String)], &Lay, &str) -> Option<T>,
+		op: impl Fn(&mut usize, &[&(&Lay, String)], &Lay, &str) -> Option<T>,
 	) -> Vec<T> {
-		self.fold_impl(&mut 0, &[], with_padding, op).0
+		self.fold_impl(&mut 0, &[], with_padding, op)
 	}
 
 	// TODO: this entire thing (and its uses) probably needs a good rethink/refactor
@@ -100,10 +100,10 @@ impl<'def> Layout<'def> {
 		abs: &mut usize,
 		parents: &[&(&Lay, String)],
 		with_padding: bool,
-		mut op: F,
-	) -> (Vec<T>, F)
+		op: F,
+	) -> Vec<T>
 	where
-		F: FnMut(&mut usize, &[&(&Lay, String)], &Lay, &str) -> Option<T>,
+		F: Fn(&mut usize, &[&(&Lay, String)], &Lay, &str) -> Option<T>,
 	{
 		let it: Vec<(usize, &Lay)> = if with_padding {
 			self.lays.iter().enumerate().collect()
@@ -131,13 +131,11 @@ impl<'def> Layout<'def> {
 				let this = (lay, name);
 				ps.push(&this);
 
-				let (extra, f) = lay.def.layout().fold_impl(abs, &ps, with_padding, op);
-				op = f; // this is a hack to avoid infinite types
-				laundry.extend(extra);
+				laundry.extend(lay.def.layout().fold_impl(abs, &ps, with_padding, &op));
 			}
 		}
 
-		(laundry, op)
+		laundry
 	}
 
 	pub fn fill(
@@ -145,51 +143,52 @@ impl<'def> Layout<'def> {
 		positional: impl IntoIterator<Item = String>,
 		keyed: HashMap<Vec<String>, String>,
 	) -> Result<Vec<u8>, FillError> {
-		let mut positional = positional.into_iter();
+		todo!()
+		// let mut positional = positional.into_iter();
 
-		// Vec<(bytes, size in bits)>
-		let fields = self
-			.fold(true, |_, parents, lay, name| {
-				let mut key = parents
-					.iter()
-					.map(|(_, name)| name.clone())
-					.collect::<Vec<String>>();
-				key.push(name.into());
+		// // Vec<(bytes, size in bits)>
+		// let fields = self
+		// 	.fold(true, |_, parents, lay, name| {
+		// 		let mut key = parents
+		// 			.iter()
+		// 			.map(|(_, name)| name.clone())
+		// 			.collect::<Vec<String>>();
+		// 		key.push(name.into());
 
-				let size = if lay.size % 8 == 0 {
-					usize::try_from(lay.size).expect(SIZE_OF_LAY)
-				} else {
-					todo!("partial-byte lay fills")
-				};
+		// 		let size = if lay.size % 8 == 0 {
+		// 			usize::try_from(lay.size).expect(SIZE_OF_LAY)
+		// 		} else {
+		// 			todo!("partial-byte lay fills")
+		// 		};
 
-				Some(if let Family::Structural = lay.def.family() {
-					return None;
-				} else if let Def::Padding(_) = lay.def.as_ref() {
-					Ok((lay.fill_as_zero(), size))
-				} else if let Some(value) = keyed.get(&key) {
-					lay.fill_from_str(&value).map(|v| (v, size))
-				} else if let Some(value) = positional.next() {
-					lay.fill_from_str(&value).map(|v| (v, size))
-				} else {
-					Ok((lay.fill_as_zero(), size))
-				})
-			})
-			.into_iter()
-			.collect::<Result<Vec<_>, _>>()?;
+		// 		Some(if let Family::Structural = lay.def.family() {
+		// 			return None;
+		// 		} else if let Def::Padding(_) = lay.def.as_ref() {
+		// 			Ok((lay.fill_as_zero(), size))
+		// 		} else if let Some(value) = keyed.get(&key) {
+		// 			lay.fill_from_str(&value).map(|v| (v, size))
+		// 		} else if let Some(value) = positional.next() {
+		// 			lay.fill_from_str(&value).map(|v| (v, size))
+		// 		} else {
+		// 			Ok((lay.fill_as_zero(), size))
+		// 		})
+		// 	})
+		// 	.into_iter()
+		// 	.collect::<Result<Vec<_>, _>>()?;
 
-		let mut buf = Cursor::new(vec![
-			0;
-			div_round_up(
-				fields.iter().map(|(_, bits)| bits).sum(),
-				8
-			)
-		]);
+		// let mut buf = Cursor::new(vec![
+		// 	0;
+		// 	div_round_up(
+		// 		fields.iter().map(|(_, bits)| bits).sum(),
+		// 		8
+		// 	)
+		// ]);
 
-		for (bytes, _) in fields {
-			buf.write(&bytes).expect("failed to write to memory???");
-		}
+		// for (bytes, _) in fields {
+		// 	buf.write(&bytes).expect("failed to write to memory???");
+		// }
 
-		Ok(buf.into_inner())
+		// Ok(buf.into_inner())
 	}
 
 	pub fn append_with_size_and_name(
