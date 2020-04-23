@@ -8,7 +8,7 @@ use super::{
 use lexpr::Value;
 use std::str::FromStr;
 
-#[derive(Clone, Debug, Hash)]
+#[derive(Clone, Copy, Debug, Hash)]
 pub struct Integral {
 	pub signed: bool,
 	pub endian: Endianness,

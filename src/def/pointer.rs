@@ -56,7 +56,7 @@ impl FromStr for Context {
 #[error("pointer context may be local or remote")]
 pub struct InvalidContextError;
 
-#[derive(Clone, Debug, Hash)]
+#[derive(Clone, Copy, Debug, Hash)]
 pub struct Pointer {
 	pub endian: Endianness,
 	pub width: ByteWidth,

@@ -1,4 +1,5 @@
 use alignment::Alignable;
+use castable::{CastError, Castable};
 use fillable::{FillError, Fillable};
 use layout::{Layable, Layout};
 use lexpr::Value;
@@ -22,6 +23,7 @@ pub use r#union::Union;
 pub mod alignment;
 pub mod array;
 pub mod boolean;
+pub mod castable;
 pub mod endianness;
 pub mod r#enum;
 pub mod fillable;
@@ -103,6 +105,23 @@ impl Def {
 			Def::Padding(_) => Family::Special,
 		}
 	}
+
+	pub fn typename(&self) -> &'static str {
+		match self {
+			Def::Boolean(_) => "boolean",
+			Def::Integral(_) => "integral",
+			Def::Float(_) => "float",
+
+			Def::Enum(_) => "enum",
+			Def::Union(_) => "union",
+
+			Def::Struct(_) => "struct",
+			Def::Array(_) => "array",
+
+			Def::Pointer(_) => "pointer",
+			Def::Padding(_) => "padding",
+		}
+	}
 }
 
 impl Alignable for Def {
@@ -164,6 +183,26 @@ impl Fillable for Def {
 			Def::Struct(_) | Def::Array(_) | Def::Padding(_) => {
 				unreachable!("structural or padding defs are not filled directly")
 			}
+		}
+	}
+}
+
+impl Castable for Def {
+	fn cast_to_string(&self, raw: &[u8]) -> Result<String, CastError> {
+		match self {
+			// Def::Boolean(b) => b.cast_to_string(raw),
+			// Def::Integral(i) => i.cast_to_string(raw),
+			// Def::Float(f) => f.cast_to_string(raw),
+
+			// Def::Enum(e) => e.cast_to_string(raw),
+			// Def::Union(u) => u.cast_to_string(raw),
+
+			// Def::Pointer(p) => p.cast_to_string(raw),
+			Def::Struct(_) | Def::Array(_) | Def::Padding(_) => {
+				unreachable!("structural or padding defs are not cast directly")
+			}
+
+			_ => todo!("casting"),
 		}
 	}
 }

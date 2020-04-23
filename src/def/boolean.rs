@@ -34,7 +34,7 @@ use lexpr::Value;
 // 	}
 // }
 
-#[derive(Clone, Debug, Hash)]
+#[derive(Clone, Copy, Debug, Hash)]
 pub struct Boolean {
 	pub width: ByteWidth,
 	// pub true_pattern: Option<BitPattern>,

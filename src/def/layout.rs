@@ -35,7 +35,7 @@ pub struct Lay<'def> {
 const SIZE_OF_LAY: &'static str = "size of lay does not fit in usize";
 
 impl<'def> Lay<'def> {
-	pub fn unique() -> usize {
+	pub fn make_unique() -> usize {
 		use std::sync::atomic::{AtomicUsize, Ordering};
 		static IOTA: AtomicUsize = AtomicUsize::new(0);
 		IOTA.fetch_add(1, Ordering::SeqCst)
@@ -52,7 +52,7 @@ impl<'def> Lay<'def> {
 			def,
 			offset,
 			size,
-			unique: Self::unique(),
+			unique: Self::make_unique(),
 		}
 	}
 
@@ -64,6 +64,20 @@ impl<'def> Lay<'def> {
 	pub fn fill_as_zero(&self) -> Vec<u8> {
 		vec![0; usize::try_from(div_round_up(self.size, 8)).expect(SIZE_OF_LAY)]
 	}
+
+	pub fn unique(&self) -> usize {
+		self.unique
+	}
+
+	pub fn extract_from_slice(&self, slice: &[u8]) -> Vec<u8> {
+		if self.offset % 8 != 0 {
+			todo!("extraction for non-aligned lays");
+		} else {
+			let start = usize::try_from(self.offset / 8).expect(SIZE_OF_LAY);
+			let end = usize::try_from((self.offset + self.size) / 8).expect(SIZE_OF_LAY);
+			slice[start..end].to_vec()
+		}
+	}
 }
 
 impl<'def> Clone for Lay<'def> {
@@ -73,7 +87,7 @@ impl<'def> Clone for Lay<'def> {
 			def: self.def.clone(),
 			offset: self.offset,
 			size: self.size,
-			unique: Self::unique(),
+			unique: Self::make_unique(),
 		}
 	}
 }
@@ -89,9 +103,9 @@ impl<'def> Layout<'def> {
 	pub fn fold<T>(
 		&self,
 		with_padding: bool,
-		op: impl FnMut(&mut usize, &[&(&Lay, String)], &Lay, &str) -> Option<T>,
+		mut op: impl FnMut(&mut usize, &[&(&Lay, String)], &Lay, &str) -> Option<T>,
 	) -> Vec<T> {
-		self.fold_impl(&mut 0, &[], with_padding, op).0
+		self.fold_impl(&mut 0, &[], with_padding, &mut op)
 	}
 
 	// TODO: this entire thing (and its uses) probably needs a good rethink/refactor
@@ -100,8 +114,8 @@ impl<'def> Layout<'def> {
 		abs: &mut usize,
 		parents: &[&(&Lay, String)],
 		with_padding: bool,
-		mut op: F,
-	) -> (Vec<T>, F)
+		op: &mut F,
+	) -> Vec<T>
 	where
 		F: FnMut(&mut usize, &[&(&Lay, String)], &Lay, &str) -> Option<T>,
 	{
@@ -131,13 +145,11 @@ impl<'def> Layout<'def> {
 				let this = (lay, name);
 				ps.push(&this);
 
-				let (extra, f) = lay.def.layout().fold_impl(abs, &ps, with_padding, op);
-				op = f; // this is a hack to avoid infinite types
-				laundry.extend(extra);
+				laundry.extend(lay.def.layout().fold_impl(abs, &ps, with_padding, op));
 			}
 		}
 
-		(laundry, op)
+		laundry
 	}
 
 	pub fn fill(
