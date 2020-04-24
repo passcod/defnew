@@ -7,13 +7,24 @@ use defnew::{
 	platform,
 };
 use lexpr::Value;
-use std::str::FromStr;
+use std::{
+	fs::File,
+	io::{stdin, BufReader, Read},
+	str::FromStr,
+};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
 	let args = App::new("defnew")
 		.author(env!("CARGO_PKG_HOMEPAGE"))
-		.about("new: reads bytes from stdin and parses them according to a given def")
+		.about("cast: reads bytes from stdin and parses them according to a given def")
 		.version(clap::crate_version!())
+		.arg(
+			Arg::with_name("file")
+				.long("file")
+				.short("f")
+				.takes_value(true)
+				.help("File to read data from instead of stdin"),
+		)
 		.arg(
 			Arg::with_name("output-format")
 				.long("output")
@@ -35,7 +46,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 		.arg(
 			Arg::with_name("def")
 				.takes_value(true)
-				.value_name("s-exp")
+				.value_name("def s-exp")
 				.required(true)
 				.help("Type definition"),
 		)
@@ -52,10 +63,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 	let layout = def.layout();
 
-	let bytes: &[u8] = &[
-		0x01, 0x00, 0x00, 0x00, 0x2a, 0x00, 0x00, 0x00, 0x85, 0xeb, 0x51, 0xb8, 0x0e, 0xf6, 0xdb,
-		0x40, 0x1e, 0x2f, 0xb6, 0xc7, 0x00, 0x00, 0x00, 0x00,
-	];
+	let bytes = if let Some(file) = args.value_of_os("file") {
+		let file = File::open(file)?;
+		let mut buf = BufReader::new(file);
+		let mut bytes = Vec::new();
+		buf.read_to_end(&mut bytes)?;
+		bytes
+	} else {
+		let mut bytes = Vec::new();
+		stdin().read_to_end(&mut bytes)?;
+		bytes
+	};
 
 	let fields = layout.fold(false, |_, parents, lay, layname| {
 		if let Family::Structural = lay.def.family() {
