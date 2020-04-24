@@ -53,8 +53,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 	let layout = def.layout();
 
 	let bytes: &[u8] = &[
-		0x00, 0x01, 0x00, 0x00, 0x00, 0x2a, 0x00, 0x00, 0xeb, 0x85, 0xb8, 0x51, 0xf6, 0x0e, 0x40,
-		0xdb, 0x2f, 0x1e, 0xc7, 0xb6, 0x00, 0x00, 0x00, 0x00,
+		0x01, 0x00, 0x00, 0x00, 0x2a, 0x00, 0x00, 0x00, 0x85, 0xeb, 0x51, 0xb8, 0x0e, 0xf6, 0xdb,
+		0x40, 0x1e, 0x2f, 0xb6, 0xc7, 0x00, 0x00, 0x00, 0x00,
 	];
 
 	let fields = layout.fold(false, |_, parents, lay, layname| {
@@ -67,8 +67,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 				.collect::<Vec<String>>();
 			name.push(layname.into());
 
-			let raw = lay.extract_from_slice(bytes);
-			let value = def.cast_to_string(&raw).expect("bad data");
+			let mut bytes = bytes.to_vec();
+			for (parent, _) in parents {
+				bytes = parent.extract_from_slice(&bytes);
+			}
+
+			let raw = lay.extract_from_slice(&bytes);
+			let value = lay.def.cast_to_string(&raw).expect("bad data");
 
 			Some(Field {
 				name,

@@ -1,5 +1,6 @@
 use super::{
 	alignment::{Alignable, Alignment},
+	castable::{CastError, Castable},
 	div_round_up,
 	fillable::{FillError, Fillable},
 	layout::{CowDef, Layable, Layout},
@@ -45,6 +46,19 @@ impl Enum {
 
 		fit_width.max(hint_width)
 	}
+
+	fn to_integral(&self) -> Option<Integral> {
+		ByteWidth::new(
+			self.true_width()
+				.try_into()
+				.unwrap_or_else(|_| todo!("enums larger than 256 bits")),
+		)
+		.map(|width| Integral {
+			signed: false,
+			endian: self.endian,
+			width,
+		})
+	}
 }
 
 impl Alignable for Enum {
@@ -75,19 +89,37 @@ impl Fillable for Enum {
 			})
 			.ok_or(FillError::UnknownVariant)?;
 
-		if let Some(width) = ByteWidth::new(
-			self.true_width()
-				.try_into()
-				.unwrap_or_else(|_| todo!("enums larger than a 256 bits")),
-		) {
-			Integral {
-				signed: false,
-				endian: self.endian,
-				width,
-			}
-			.fill_from_str(&value.to_string())
+		if let Some(int) = self.to_integral() {
+			int.fill_from_str(&value.to_string())
 		} else {
 			Ok(Vec::new())
+		}
+	}
+}
+
+impl Castable for Enum {
+	fn cast_to_string(&self, raw: &[u8]) -> Result<String, CastError> {
+		if let Some(int) = self.to_integral() {
+			let value: u64 = int
+				.cast_to_string(raw)?
+				.parse()
+				.or(Err(CastError::EnumValueTooLarge))?;
+
+			let variant = self
+				.variants
+				.iter()
+				.find_map(|variant| {
+					if variant.value == value {
+						Some(variant.name.clone())
+					} else {
+						None
+					}
+				})
+				.unwrap_or_else(|| value.to_string());
+
+			Ok(variant)
+		} else {
+			Ok(String::new())
 		}
 	}
 }

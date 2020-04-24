@@ -1,9 +1,10 @@
 use super::{
 	alignment::{Alignable, Alignment},
+	castable::{CastError, Castable},
 	fillable::{FillError, Fillable},
 	layout::{CowDef, Layable, Layout},
 	parse::{self, Parse, ParseError},
-	sexp_pair, ByteWidth, Def,
+	sexp_pair, ByteWidth, Def, Endianness, Integral,
 };
 use lexpr::Value;
 
@@ -75,6 +76,24 @@ impl Fillable for Boolean {
 			"true" | "1" => 1,
 			_ => 0,
 		}])
+	}
+}
+
+impl Castable for Boolean {
+	fn cast_to_string(&self, raw: &[u8]) -> Result<String, CastError> {
+		Integral {
+			signed: false,
+			endian: Endianness::Native, // do boolean defs need endianness???
+			width: self.width,
+		}
+		.cast_to_string(raw)
+		.map(|s| {
+			match s.as_str() {
+				"0" => "false",
+				_ => "true",
+			}
+			.to_string()
+		})
 	}
 }
 

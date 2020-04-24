@@ -1,5 +1,6 @@
 use super::{
 	alignment::{Alignable, Alignment},
+	castable::{CastError, Castable},
 	fillable::{FillError, Fillable},
 	layout::{CowDef, Layable, Layout},
 	parse::{self, Parse, ParseError},
@@ -98,6 +99,12 @@ impl Fillable for Union {
 		}
 
 		Ok(bytes)
+	}
+}
+
+impl Castable for Union {
+	fn cast_to_string(&self, _raw: &[u8]) -> Result<String, CastError> {
+		todo!("casting unions")
 	}
 }
 

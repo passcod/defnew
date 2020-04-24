@@ -6,6 +6,9 @@ pub trait Castable {
 
 #[derive(Debug, Error)]
 pub enum CastError {
-	#[error("todo")]
-	Todo,
+	#[error("{0}")]
+	InvalidLength(#[from] std::array::TryFromSliceError),
+
+	#[error("enum value is too large for a u64 (unsupported)")]
+	EnumValueTooLarge,
 }

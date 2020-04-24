@@ -1,5 +1,6 @@
 use super::{
 	alignment::{Alignable, Alignment},
+	castable::{CastError, Castable},
 	fillable::{FillError, Fillable},
 	layout::{CowDef, Layable, Layout},
 	parse::{self, Parse, ParseError},
@@ -58,6 +59,38 @@ impl Fillable for Integral {
 			8 => filler!(self, u64, i64, s),
 			16 => filler!(self, u128, i128, s),
 			_ => todo!("fill for arbitrary-width integrals"),
+		})
+	}
+}
+
+impl Castable for Integral {
+	fn cast_to_string(&self, raw: &[u8]) -> Result<String, CastError> {
+		macro_rules! caster {
+			($this:expr, $length:expr, $utype:ty, $itype:ty, $r:expr) => {
+				if $this.signed {
+					caster!($length, $this.endian, $itype, $r)
+				} else {
+					caster!($length, $this.endian, $utype, $r)
+					}
+			};
+			($length:expr, $endian:expr, $numtype:ty, $r:expr) => {{
+				use ::std::convert::TryInto;
+				let bytes: [u8; $length] = $r.try_into()?;
+				match $endian {
+					Endianness::Big => <$numtype>::from_be_bytes(bytes).to_string(),
+					Endianness::Little => <$numtype>::from_le_bytes(bytes).to_string(),
+					Endianness::Native => <$numtype>::from_ne_bytes(bytes).to_string(),
+					}
+				}};
+		}
+
+		Ok(match self.width.get() {
+			1 => caster!(self, 1, u8, i8, raw),
+			2 => caster!(self, 2, u16, i16, raw),
+			4 => caster!(self, 4, u32, i32, raw),
+			8 => caster!(self, 8, u64, i64, raw),
+			16 => caster!(self, 16, u128, i128, raw),
+			_ => todo!("cast for arbitrary-width integrals"),
 		})
 	}
 }

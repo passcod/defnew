@@ -1,5 +1,6 @@
 use super::{
 	alignment::{Alignable, Alignment},
+	castable::{CastError, Castable},
 	fillable::{FillError, Fillable},
 	layout::{CowDef, Layable, Layout},
 	parse::{self, Parse, ParseError},
@@ -88,6 +89,17 @@ impl Fillable for Pointer {
 			width: self.width,
 		}
 		.fill_from_str(s)
+	}
+}
+
+impl Castable for Pointer {
+	fn cast_to_string(&self, raw: &[u8]) -> Result<String, CastError> {
+		Integral {
+			signed: false,
+			endian: self.endian,
+			width: self.width,
+		}
+		.cast_to_string(raw)
 	}
 }
 

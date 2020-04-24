@@ -190,19 +190,17 @@ impl Fillable for Def {
 impl Castable for Def {
 	fn cast_to_string(&self, raw: &[u8]) -> Result<String, CastError> {
 		match self {
-			// Def::Boolean(b) => b.cast_to_string(raw),
-			// Def::Integral(i) => i.cast_to_string(raw),
-			// Def::Float(f) => f.cast_to_string(raw),
+			Def::Boolean(b) => b.cast_to_string(raw),
+			Def::Integral(i) => i.cast_to_string(raw),
+			Def::Float(f) => f.cast_to_string(raw),
 
-			// Def::Enum(e) => e.cast_to_string(raw),
-			// Def::Union(u) => u.cast_to_string(raw),
+			Def::Enum(e) => e.cast_to_string(raw),
+			Def::Union(u) => u.cast_to_string(raw),
 
-			// Def::Pointer(p) => p.cast_to_string(raw),
+			Def::Pointer(p) => p.cast_to_string(raw),
 			Def::Struct(_) | Def::Array(_) | Def::Padding(_) => {
 				unreachable!("structural or padding defs are not cast directly")
 			}
-
-			_ => todo!("casting"),
 		}
 	}
 }

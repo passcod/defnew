@@ -1,5 +1,6 @@
 use super::{
 	alignment::{Alignable, Alignment},
+	castable::{CastError, Castable},
 	fillable::{FillError, Fillable},
 	layout::{CowDef, Layable, Layout},
 	parse::{self, Parse, ParseError},
@@ -110,6 +111,28 @@ impl Fillable for Float {
 			Format::Binary32 => filler!(self.endian, f32, s),
 			Format::Binary64 => filler!(self.endian, f64, s),
 			_ => todo!("fill for binary{{16,128,256}} and decimal floats"),
+		})
+	}
+}
+
+impl Castable for Float {
+	fn cast_to_string(&self, raw: &[u8]) -> Result<String, CastError> {
+		macro_rules! caster {
+			($endian:expr, $numtype:ty, $r:expr) => {{
+				use ::std::{convert::TryInto, mem::size_of};
+				let bytes: [u8; size_of::<$numtype>()] = $r.try_into()?;
+				match $endian {
+					Endianness::Big => <$numtype>::from_be_bytes(bytes).to_string(),
+					Endianness::Little => <$numtype>::from_le_bytes(bytes).to_string(),
+					Endianness::Native => <$numtype>::from_ne_bytes(bytes).to_string(),
+					}
+				}};
+		}
+
+		Ok(match self.format {
+			Format::Binary32 => caster!(self.endian, f32, raw),
+			Format::Binary64 => caster!(self.endian, f64, raw),
+			_ => todo!("cast for binary{{16,128,256}} and decimal floats"),
 		})
 	}
 }
