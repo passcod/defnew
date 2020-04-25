@@ -11,6 +11,7 @@ use defnew::{
 };
 use std::{
 	collections::HashMap,
+	fs::File,
 	io::{stdout, Write},
 	str::FromStr,
 };
@@ -28,6 +29,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 				.long("show-fields")
 				.short("F")
 				.help("Shows field paths for the def given instead"),
+		)
+		.arg(
+			Arg::with_name("file")
+				.long("output")
+				.short("o")
+				.takes_value(true)
+				.value_name("path")
+				.help("Writes to file instead of stdout"),
 		)
 		.arg(
 			Arg::with_name("def")
@@ -88,11 +97,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 	let bytes = layout.fill(positional, keyed)?;
 
-	if cfg!(windows) {
-		todo!("printing raw bytes out is not supported on windows, so this tool cannot work as is. bytes in hex: {:02x?}", bytes);
+	if let Some(file) = args.value_of_os("file") {
+		let mut file = File::create(file)?;
+		file.write_all(&bytes)?;
+	} else {
+		stdout().write_all(&bytes)?;
 	}
-
-	stdout().write_all(&bytes)?;
 
 	Ok(())
 }
