@@ -17,7 +17,10 @@ use std::{
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
 	let args = App::new("defnew")
-		.author(env!("CARGO_PKG_HOMEPAGE"))
+		.author(&*format!(
+			"CC BY-SA-NC 4.0 - {}",
+			env!("CARGO_PKG_HOMEPAGE")
+		))
 		.about("new: given a def and some values (missing ones default to zeroed), outputs bytes")
 		.version(clap::crate_version!())
 		.arg(
