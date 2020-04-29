@@ -76,6 +76,7 @@ pub enum Def {
 	Array(Array),
 
 	// special:
+	Opaque,
 	Pointer(Pointer),
 	Padding(BitWidth),
 }
@@ -101,6 +102,7 @@ impl Def {
 			Def::Struct(_) => Family::Structural,
 			Def::Array(_) => Family::Structural,
 
+			Def::Opaque => Family::Special,
 			Def::Pointer(_) => Family::Special,
 			Def::Padding(_) => Family::Special,
 		}
@@ -118,6 +120,7 @@ impl Def {
 			Def::Struct(_) => "struct",
 			Def::Array(_) => "array",
 
+			Def::Opaque => "opaque",
 			Def::Pointer(_) => "pointer",
 			Def::Padding(_) => "padding",
 		}
@@ -137,6 +140,7 @@ impl Alignable for Def {
 			Def::Struct(s) => s.align(),
 			Def::Array(a) => a.align(),
 
+			Def::Opaque => unsafe { Alignment::new_unchecked(1_u8) },
 			Def::Pointer(p) => p.align(),
 			Def::Padding(bits) => {
 				// Padding doesn't really have an alignment
@@ -159,6 +163,7 @@ impl Layable for Def {
 			Def::Struct(s) => s.layout(),
 			Def::Array(a) => a.layout(),
 
+			Def::Opaque => Layout::default(),
 			Def::Pointer(p) => p.layout(),
 			Def::Padding(bits) => {
 				let mut layout = Layout::default();
@@ -179,6 +184,7 @@ impl Fillable for Def {
 			Def::Enum(e) => e.fill_from_str(s),
 			Def::Union(u) => u.fill_from_str(s),
 
+			Def::Opaque => unreachable!("opaque cannot be created"),
 			Def::Pointer(p) => p.fill_from_str(s),
 			Def::Struct(_) | Def::Array(_) | Def::Padding(_) => {
 				unreachable!("structural or padding defs are not filled directly")
@@ -197,6 +203,7 @@ impl Castable for Def {
 			Def::Enum(e) => e.cast_to_string(raw),
 			Def::Union(u) => u.cast_to_string(raw),
 
+			Def::Opaque => Ok(String::from("opaque")),
 			Def::Pointer(p) => p.cast_to_string(raw),
 			Def::Struct(_) | Def::Array(_) | Def::Padding(_) => {
 				unreachable!("structural or padding defs are not cast directly")
@@ -218,6 +225,7 @@ impl From<Def> for Value {
 			Def::Struct(native) => native.into(),
 			Def::Array(native) => native.into(),
 
+			Def::Opaque => Self::list(vec![Self::symbol("opaque")]),
 			Def::Padding(bits) => Self::list(vec![Self::symbol("padding"), bits.get().into()]),
 			Def::Pointer(native) => native.into(),
 		}

@@ -203,8 +203,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 				),
 		)
 		.subcommand(
+			SubCommand::with_name("opaque")
+				.about("Makes an opaque def (low-level)")
+		)
+		.subcommand(
 			SubCommand::with_name("pointer")
-				.about("Makes a pointer def (low-level)")
+				.about("Makes a raw pointer def (low-level)")
 				.arg(endianness.clone())
 				.arg(
 					Arg::with_name("width")
@@ -212,6 +216,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 						.takes_value(true)
 						.default_value(&pointer_width_default)
 						.help("Specifies pointer width"),
+				)
+				.arg(
+					Arg::with_name("mutable")
+						.help("Whether pointer is mutable"),
+				)
+				.arg(
+					Arg::with_name("points-to")
+						.long("points-to")
+						.takes_value(true)
+						.value_name("def")
+						.help("Specifies what type is behind the pointer"),
 				)
 				.arg(
 					Arg::with_name("context")
@@ -261,6 +276,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 		("union", Some(subargs)) => make_union(subargs),
 		("array", Some(subargs)) => make_array(subargs),
 
+		("opaque", _) => Def::Opaque,
 		("pointer", Some(subargs)) => make_pointer(subargs),
 		("padding", Some(subargs)) => make_padding(subargs),
 
@@ -515,12 +531,23 @@ fn make_pointer(args: &clap::ArgMatches<'_>) -> Def {
 
 	let context = value_t!(args, "context", Context).unwrap_or_else(|e| e.exit());
 	let value = value_t!(args, "value", u64).unwrap_or_else(|e| e.exit());
+	let mutable = args.is_present("mutable");
+
+	let def = if let Some(typestr) = args.value_of("points-to") {
+		Some(Box::new(parse_def(typestr).unwrap_or_else(|err| {
+			clap::Error::with_description(&err.to_string(), clap::ErrorKind::InvalidValue).exit()
+		})))
+	} else {
+		None
+	};
 
 	Def::Pointer(Pointer {
 		width,
 		endian,
 		context,
+		mutable,
 		value,
+		def,
 	})
 }
 

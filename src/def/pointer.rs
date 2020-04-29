@@ -12,7 +12,27 @@ use thiserror::Error;
 
 #[derive(Clone, Copy, Debug, Hash)]
 pub enum Context {
+	/// Local to the bunch of data we're looking at, or local to the def this pointer is in.
+	///
+	/// This is a fuzzy definition but generally means that the pointer is relative to whatever
+	/// the start of the data we were given is.
+	///
+	/// This is relevant because defs aim to *model* program memory, but are *not* program memory.
+	/// A pointer in a def with a context of local is pointing to some other place within that same
+	/// def.
+	///
+	/// Also read the docs for Remote.
 	Local,
+
+	/// Remote to this particular data blob or def.
+	///
+	/// This might mean that it is somewhere in program memory, whether that's inside or outside
+	/// the def. But there is no prescribed meaning besides that it is not Local.
+	///
+	/// All external data that contains pointers starts with Remote pointers, and when applicable
+	/// the defnew tooling might convert some Remote pointers to Local pointers, such that they
+	/// make sense when read outside of the program context, and tooling may also convert Local
+	/// pointers to Remote pointers when using provided data in a program context.
 	Remote,
 }
 
@@ -57,12 +77,24 @@ impl FromStr for Context {
 #[error("pointer context may be local or remote")]
 pub struct InvalidContextError;
 
-#[derive(Clone, Copy, Debug, Hash)]
+#[derive(Clone, Debug, Hash)]
 pub struct Pointer {
 	pub endian: Endianness,
 	pub width: ByteWidth,
 	pub context: Context,
+
+	/// Describes whether this is a *mut or a *const
+	///
+	/// What that means exactly is not defined at this point.
+	pub mutable: bool,
+
+	/// The value or "offset" of the pointer.
 	pub value: u64,
+
+	/// Describes the type of data behind the pointer.
+	///
+	/// `None` does not mean that the pointer is opaque: this is indicated by `Some(Def::Opaque)`.
+	pub def: Option<Box<Def>>,
 }
 
 impl Alignable for Pointer {
@@ -111,13 +143,22 @@ impl From<Pointer> for Def {
 
 impl From<Pointer> for Value {
 	fn from(native: Pointer) -> Self {
-		Self::list(vec![
+		let mut def = vec![
 			Self::symbol("pointer"),
 			sexp_pair(Self::symbol("endian"), native.endian),
 			sexp_pair(Self::symbol("width"), native.width.get()),
-			sexp_pair(Self::symbol("context"), native.context),
-			Self::Number(native.value.into()),
-		])
+		];
+
+		if native.mutable {
+			def.push(sexp_pair(Self::symbol("mutable"), true));
+		}
+
+		if let Some(typ) = native.def {
+			def.push(sexp_pair(Self::symbol("points-to"), *typ));
+		}
+
+		def.push(Self::Number(native.value.into()));
+		Self::list(def)
 	}
 }
 
@@ -126,6 +167,13 @@ impl Parse for Pointer {
 		let endian = parse::endianness_field(&sexp, "endian")?.unwrap_or_default();
 		let width = parse::required("width", parse::nonzero_u8_field(&sexp, "width")?)?;
 		let context = parse::required("context", parse::sym_field(&sexp, "context"))?.parse()?;
+
+		let mutable = parse::bool_field(&sexp, "mutable").unwrap_or(false);
+
+		let def = match parse::field(&sexp, "points-to") {
+			Some(d) => Some(Box::new(Def::from_sexp(d)?)),
+			None => None,
+		};
 
 		let value = sexp
 			.to_ref_vec()
@@ -140,7 +188,9 @@ impl Parse for Pointer {
 			endian,
 			width,
 			context,
+			mutable,
 			value,
+			def,
 		})
 	}
 }
