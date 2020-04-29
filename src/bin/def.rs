@@ -4,7 +4,7 @@ extern crate clap;
 use clap::{App, AppSettings, Arg, SubCommand};
 use defnew::{
 	def::{self, layout::Layable, Def},
-	platform,
+	parse_def, platform,
 };
 use lexpr::Value;
 use std::str::FromStr;
@@ -283,13 +283,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 		("parse", Some(subargs)) => {
 			let typestr = value_t!(subargs, "def", String).unwrap_or_else(|e| e.exit());
 
-			platform::parse_native_type(&typestr)
-				.ok_or(NoCommandProvided)
-				.or_else(|_| Def::from_str(&typestr))
-				.unwrap_or_else(|err| {
-					clap::Error::with_description(&err.to_string(), clap::ErrorKind::InvalidValue)
-						.exit()
-				})
+			parse_def(&typestr).unwrap_or_else(|err| {
+				clap::Error::with_description(&err.to_string(), clap::ErrorKind::InvalidValue)
+					.exit()
+			})
 		}
 
 		(alias, _) => {
@@ -463,8 +460,8 @@ fn make_union(args: &clap::ArgMatches<'_>) -> Def {
 	let mut alterns = Vec::with_capacity(alts.len());
 	for arg in alts {
 		let parts: Vec<&str> = arg.splitn(2, ":").collect();
-		let (name, typedef) = match *parts {
-			[name, typedef] => (name, typedef),
+		let (name, typestr) = match *parts {
+			[name, typestr] => (name, typestr),
 			_ => clap::Error::with_description(
 				"alternate format must be name:type",
 				clap::ErrorKind::InvalidValue,
@@ -474,13 +471,10 @@ fn make_union(args: &clap::ArgMatches<'_>) -> Def {
 
 		alterns.push(Altern {
 			name: name.into(),
-			def: platform::parse_native_type(typedef)
-				.ok_or(NoCommandProvided)
-				.or_else(|_| Def::from_str(typedef))
-				.unwrap_or_else(|err| {
-					clap::Error::with_description(&err.to_string(), clap::ErrorKind::InvalidValue)
-						.exit()
-				}),
+			def: parse_def(typestr).unwrap_or_else(|err| {
+				clap::Error::with_description(&err.to_string(), clap::ErrorKind::InvalidValue)
+					.exit()
+			}),
 		});
 	}
 
@@ -505,15 +499,9 @@ fn make_array(args: &clap::ArgMatches<'_>) -> Def {
 			.map(Some)
 			.unwrap_or_else(exit_unless_none),
 		length: value_t!(args, "length", NonZeroU64).unwrap_or_else(|e| e.exit()),
-		def: Box::new(
-			platform::parse_native_type(&typestr)
-				.ok_or(NoCommandProvided)
-				.or_else(|_| Def::from_str(&typestr))
-				.unwrap_or_else(|err| {
-					clap::Error::with_description(&err.to_string(), clap::ErrorKind::InvalidValue)
-						.exit()
-				}),
-		),
+		def: Box::new(parse_def(&typestr).unwrap_or_else(|err| {
+			clap::Error::with_description(&err.to_string(), clap::ErrorKind::InvalidValue).exit()
+		})),
 	})
 }
 

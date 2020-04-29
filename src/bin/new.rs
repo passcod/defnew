@@ -5,15 +5,14 @@ use clap::{App, Arg};
 use defnew::{
 	def::{
 		layout::{Layable, Layout},
-		Def, Family,
+		Family,
 	},
-	platform,
+	parse_def,
 };
 use std::{
 	collections::HashMap,
 	fs::File,
 	io::{stdout, Write},
-	str::FromStr,
 };
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -56,12 +55,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 	let typestr = value_t!(args, "def", String).unwrap_or_else(|e| e.exit());
 
-	let def = platform::parse_native_type(&typestr)
-		.ok_or(clap::ErrorKind::InvalidValue)
-		.or_else(|_| Def::from_str(&typestr))
-		.unwrap_or_else(|err| {
-			clap::Error::with_description(&err.to_string(), clap::ErrorKind::InvalidValue).exit()
-		});
+	let def = parse_def(&typestr).unwrap_or_else(|err| {
+		clap::Error::with_description(&err.to_string(), clap::ErrorKind::InvalidValue).exit()
+	});
 
 	let layout = def.layout();
 

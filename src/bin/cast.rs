@@ -3,8 +3,8 @@ extern crate clap;
 
 use clap::{App, Arg};
 use defnew::{
-	def::{castable::Castable, layout::Layable, Def, Family},
-	platform,
+	def::{castable::Castable, layout::Layable, Family},
+	parse_def,
 };
 use lexpr::Value;
 use std::{
@@ -63,12 +63,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 	let typestr = value_t!(args, "def", String).unwrap_or_else(|e| e.exit());
 
-	let def = platform::parse_native_type(&typestr)
-		.ok_or(clap::ErrorKind::InvalidValue)
-		.or_else(|_| Def::from_str(&typestr))
-		.unwrap_or_else(|err| {
-			clap::Error::with_description(&err.to_string(), clap::ErrorKind::InvalidValue).exit()
-		});
+	let def = parse_def(&typestr).unwrap_or_else(|err| {
+		clap::Error::with_description(&err.to_string(), clap::ErrorKind::InvalidValue).exit()
+	});
 
 	let layout = def.layout();
 
