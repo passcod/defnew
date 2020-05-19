@@ -89,6 +89,7 @@ pub struct Pointer {
 	pub mutable: bool,
 
 	/// The value or "offset" of the pointer.
+	// Probably not actually needed or relevant? Value is in the data, not the def
 	pub value: u64,
 
 	/// Describes the type of data behind the pointer.

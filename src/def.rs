@@ -5,6 +5,7 @@ use layout::{Layable, Layout};
 use lexpr::Value;
 use parse::Parse;
 use std::{
+	fmt,
 	num::{NonZeroU64, NonZeroU8},
 	str::FromStr,
 };
@@ -229,6 +230,13 @@ impl From<Def> for Value {
 			Def::Padding(bits) => Self::list(vec![Self::symbol("padding"), bits.get().into()]),
 			Def::Pointer(native) => native.into(),
 		}
+	}
+}
+
+impl fmt::Display for Def {
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+		let sexp: Value = self.clone().into();
+		sexp.fmt(f)
 	}
 }
 
