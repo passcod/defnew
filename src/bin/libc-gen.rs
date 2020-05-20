@@ -70,7 +70,23 @@ impl About {
 	}
 }
 
-const IGNORED_TYPES: [&'static str; 4] = [
+#[rustfmt::skip]
+const IGNORED_TYPES: [&'static str; 14] = [
+	// unprintable consts
+	"SEM_FAILED",   // sem_t
+	"RTLD_DEFAULT", // *mut c_void
+	"RTLD_NEXT",    // *mut c_void
+	"MAP_FAILED",   // *mut c_void
+
+	// initialiser consts
+	"PTHREAD_RWLOCK_INITIALIZER",
+	"PTHREAD_COND_INITIALIZER",
+	"PTHREAD_MUTEX_INITIALIZER",
+	"PTHREAD_ADAPTIVE_MUTEX_INITIALIZER_NP",
+	"PTHREAD_ERRORCHECK_MUTEX_INITIALIZER_NP",
+	"PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP",
+
+	// structs
 	"sigaction",  // contains an extern "C" fn()
 	"ucontext_t", // recursive
 	"addrinfo",   // recursive
@@ -140,51 +156,130 @@ fn main() -> color_eyre::Result<()> {
 		print!(".");
 	}
 
-	println!("\ngot {} consts, {} types", consts.len(), types.len());
+	// libc-const
+	{
+		println!("obtained {} consts", consts.len());
 
-	let mut libc_consts = File::create("src/bin/libc-const.rs")?;
-	writeln!(
-		&libc_consts,
-		r#"
-		#![rustfmt::skip]
-		#[macro_use]
-		extern crate clap;
-
-		use clap::{{App, SubCommand}};
-
-		fn main() -> color_eyre::Result<()> {{
-			let args = App::new("defnew")
-				.author(&*format!(
-					"CC BY-SA-NC 4.0 - {{}}",
-					env!("CARGO_PKG_HOMEPAGE")
-				))
-				.about("libc-const: provides values for libc constants")
-				.version(clap::crate_version!())
-		"#
-	)?;
-
-	for constant in &consts {
+		let libc_const_file = File::create("src/bin/libc-const.rs")?;
 		writeln!(
-			&libc_consts,
-			r#".subcommand(SubCommand::with_name("{}"))"#,
-			constant
+			&libc_const_file,
+			r#"
+			#[rustfmt::skip]
+			#[allow(deprecated)]
+			fn main() {{
+				let args = clap::App::new("defnew")
+					.author(&*format!(
+						"CC BY-SA-NC 4.0 - {{}}",
+						env!("CARGO_PKG_HOMEPAGE")
+					))
+					.about("libc-const: provides values for libc constants")
+					.after_help("Values are hard-coded at compile and are not guaranteed to be correct for your system.")
+					.version(clap::crate_version!())
+					.setting(clap::AppSettings::SubcommandRequired)
+			"#
 		)?;
+
+		for constant in &consts {
+			writeln!(
+				&libc_const_file,
+				r#".subcommand(clap::SubCommand::with_name("{}"))"#,
+				constant
+			)?;
+		}
+
+		writeln!(
+			&libc_const_file,
+			r#"
+			.get_matches();
+
+			println!("{{}}", match args.subcommand_name().unwrap() {{
+			"#
+		)?;
+
+		for constant in &consts {
+			writeln!(
+				&libc_const_file,
+				r#""{c}" => libc::{c}.to_string(),"#,
+				c = constant
+			)?;
+		}
+
+		writeln!(
+			&libc_const_file,
+			r#"
+				_ => unreachable!("unknown command")
+			}});
+		}}"#
+		)?;
+
+		println!("wrote src/bin/libc-const.rs");
 	}
 
-	writeln!(
-		&libc_consts,
-		r#"
-		.get_matches();
-		dbg!(args);
-		Ok(())
-	}}"#
-	)?;
+	// for (name, def) in types {
+	// 	println!("\n{} = {}", name, def);
+	// }
 
-	types.resolve_all()?;
-	let types = types.finalise();
+	// libc-def
+	{
+		println!("resolving {} types", types.len());
+		types.resolve_all()?;
+		let types = types.finalise();
 
-	for (name, def) in types {
-		println!("\n{} = {}", name, def);
+		println!("writing types");
+		let libc_def_file = File::create("src/bin/libc-def.rs")?;
+		writeln!(
+			&libc_def_file,
+			r#"
+			#[rustfmt::skip]
+			#[allow(deprecated)]
+			fn main() {{
+				let args = clap::App::new("defnew")
+					.author(&*format!(
+						"CC BY-SA-NC 4.0 - {{}}",
+						env!("CARGO_PKG_HOMEPAGE")
+					))
+					.about("libc-def: provides defs for libc types")
+					.after_help("Defs are hard-coded at compile and are not guaranteed to be correct for your system.")
+					.version(clap::crate_version!())
+					.setting(clap::AppSettings::SubcommandRequired)
+			"#
+		)?;
+
+		for (name, _) in &types {
+			writeln!(
+				&libc_def_file,
+				r#".subcommand(clap::SubCommand::with_name("{}"))"#,
+				name
+			)?;
+		}
+
+		writeln!(
+			&libc_def_file,
+			r#"
+			.get_matches();
+
+			println!("{{}}", match args.subcommand_name().unwrap() {{
+			"#
+		)?;
+
+		for (name, value) in &types {
+			writeln!(
+				&libc_def_file,
+				r##""{name}" => r#"{value}"#,"##,
+				name = name,
+				value = value,
+			)?;
+		}
+
+		writeln!(
+			&libc_def_file,
+			r#"
+				_ => unreachable!("unknown command")
+			}});
+		}}"#
+		)?;
+
+		println!("wrote src/bin/libc-def.rs");
 	}
 
 	Ok(())
