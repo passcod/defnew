@@ -10,7 +10,7 @@ use lexpr::Value;
 use std::str::FromStr;
 use thiserror::Error;
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+fn main() -> color_eyre::Result<()> {
 	let pointer_width_default = platform::native::POINTER_WIDTH.to_string();
 	let endianness = Arg::with_name("endian")
 		.long("endian")
@@ -193,7 +193,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 					Arg::with_name("length")
 						.takes_value(true)
 						.required(true)
-						.help("Array length"),
+						.help("Array length (zero for unspecified)"),
 				)
 				.arg(
 					Arg::with_name("type")
@@ -498,7 +498,7 @@ fn make_array(args: &clap::ArgMatches<'_>) -> Def {
 		stride: value_t!(args, "stride", NonZeroU64)
 			.map(Some)
 			.unwrap_or_else(exit_unless_none),
-		length: value_t!(args, "length", NonZeroU64).unwrap_or_else(|e| e.exit()),
+		length: NonZeroU64::new(value_t!(args, "length", u64).unwrap_or_else(|e| e.exit())),
 		def: Box::new(parse_def(&typestr).unwrap_or_else(|err| {
 			clap::Error::with_description(&err.to_string(), clap::ErrorKind::InvalidValue).exit()
 		})),

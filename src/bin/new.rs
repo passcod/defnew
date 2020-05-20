@@ -15,7 +15,7 @@ use std::{
 	io::{stdout, Write},
 };
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+fn main() -> color_eyre::Result<()> {
 	let args = App::new("defnew")
 		.author(&*format!(
 			"CC BY-SA-NC 4.0 - {}",
