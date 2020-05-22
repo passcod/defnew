@@ -284,15 +284,15 @@ And it can write types and raws like that too:
 ```bash
 new "$jamdef" 850 700 true | cast "$jamdef" --with-defs --with-raws -o env
 
-fruit=850
-fruit__DEF=(integral (signed #f) (endian little) (width 8))
-fruit__RAW=5203000000000000
-sugar=700
-sugar__DEF=(integral (signed #f) (endian little) (width 8))
-sugar__RAW=bc02000000000000
-cooked=true
-cooked__DEF=(bool)
-cooked__RAW=01
+fruit='850'
+fruit__DEF='(integral (signed #f) (endian little) (width 8))'
+fruit__RAW='5203000000000000'
+sugar='700'
+sugar__DEF='(integral (signed #f) (endian little) (width 8))'
+sugar__RAW='bc02000000000000'
+cooked='true'
+cooked__DEF='(bool)'
+cooked__RAW='01'
 ```
 
 When constructing with `new`, padding is zeroes, which is different from how programs construct

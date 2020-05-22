@@ -191,19 +191,19 @@ fn render_plain(field: Field, with: With) {
 
 fn render_env(field: Field, with: With) {
 	let name = field.name.join("_");
-	println!("{}={}", name, field.value);
+	println!("{}='{}'", name, field.value);
 
 	if with.types {
-		println!("{}__TYPE={}", name, field.typename);
+		println!("{}__TYPE='{}'", name, field.typename);
 	}
 
 	if with.defs {
-		println!("{}__DEF={}", name, field.def);
+		println!("{}__DEF='{}'", name, field.def);
 	}
 
 	if with.raws {
 		println!(
-			"{}__RAW={}",
+			"{}__RAW='{}'",
 			name,
 			field
 				.raw
