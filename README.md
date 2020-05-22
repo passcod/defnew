@@ -103,7 +103,7 @@ Oh boy. What's all this?
 
 Recall that Defnew is all about handling C ABI data. To do that, it needs to know the precise
 layout of the data. So in this "normalised" output, it includes a lot of information that is
-defaulted or platform-dependent when we use the shorter, human-friendly forms before.
+defaulted or platform-dependent when we use the shorter, human-friendly forms from before.
 
 Above, we didn't specify an endianness. That defaults to `native`, and on my platform (x86_64),
 this works out to `little`. We didn't specify a minimum alignment for the struct, so defnew
@@ -135,9 +135,9 @@ an example:
 def struct "fruit:$(def uint 8)" "sugar:$(def uint 8)" "cooked:$(def bool)"
 ```
 
-Because this is all simple shell stuff, it is trivial to make types that are parametric based on
+Because this is all shell interpolation and substitution, you can make types parametric based on
 inputs to a script, accept arbitrary defs and wrap them, etc. Here's a short script that varies the
-width of a uint based on what will fit the input:
+width of a uint based on what will fit the input, up to 32 bits:
 
 ```bash
 #!/usr/bin/env bash
@@ -170,7 +170,7 @@ def --show-layout struct fruit:u64 sugar:u64 cooked:bool
 00000128 -> 00000136       1 bytes  [Boolean(Boolean { width: 1 })]
 00000136 -> 00000192       7 bytes  [Padding(56)]
 
-(struct (size 24) (align 8) (field "fruit" (integral (signed #f) (endian little) (width 8))) (field "sugar" (integral (signed #f) (endian little) (width 8))) (field "cooked" (bool)))
+(struct (size 24) (align 8) (field "fruit" (integral ...
 ```
 
 The two leftmost columns show the start and end offsets of each item in _bits_, then the size of
@@ -190,12 +190,154 @@ def --show-layout struct --packed 4 fruit:u64 sugar:u64 cooked:bool
 00000128 -> 00000136       1 bytes  [Boolean(Boolean { width: 1 })]
 00000136 -> 00000160       3 bytes  [Padding(24)]
 
-(struct (size 20) (packed 4) (align 4) (field "fruit" (integral (signed #f) (endian little) (width 8))) (field "sugar" (integral (signed #f) (endian little) (width 8))) (field "cooked" (bool)))
+(struct (size 20) (packed 4) (align 4) (field "fruit" (integral ...
 ```
 
 Note that defnew is specifically concerned with the C layout. Struct fields always start at offset
 zero, no reordering takes place, etc.
 
 ### Constructions: the `new` and `cast` tools
+
+These two tools perform the opposite actions:
+
+- **`new`** constructs a blob of binary according to the layout of a given **def** and some values.
+- **`cast`** deconstructs a blob of binary according to a given **def** and outputs values.
+
+This is what allows you to actually make use of defs and manipulate data. There's really not that
+much complexity to it, so I'll show a few examples.
+
+Assuming the jam def above (either the handcrafted or the normalised version) is in `$jamdef`:
+
+```bash
+new "$jamdef" 850 700 false
+
+R
+```
+
+Err. What?
+
+The `new` tool, by default, outputs on stdout. This is great for piping and general practice, but
+not great for demonstration purposes. Let's get it in hex instead... by piping it to `hexdump`:
+
+```bash
+new "$jamdef" 850 700 true | hexdump -C
+
+00000000  52 03 00 00 00 00 00 00  bc 02 00 00 00 00 00 00  |R...............|
+00000010  01 00 00 00 00 00 00 00                           |........|
+00000018
+```
+
+850 in decimal is `0x352`, and 700 is `0x2bc`, and in little-endian order, you can clearly see two
+`u64`s (the first line, with two blocks of 8 bytes each), followed by a single 0x01 byte, followed
+by seven other 0x00 bytes (the boolean and the padding).
+
+That's our data, all laid out and properly written.
+
+Now if we take that data and pass it back to `cast`, with that same def:
+
+```bash
+new "$jamdef" 850 700 true | cast "$jamdef"
+
+fruit:  850
+sugar:  700
+cooked: true
+```
+
+Magical.
+
+We can also do type punning or transmuting by using a different def on the output, and we're also
+not obligated to decode _all_ the data. Let's cast out the first two bytes as... well, bytes:
+
+```bash
+new "$jamdef" 850 700 true | cast "$(def struct u8 u8)"
+
+0:      82
+1:      3
+```
+
+On Windows, it is illegal (and UB) to output non-UTF16 data on stdout. So both tools can also read
+and write files, with `new -o path/to/file` and `cast -f path/to/file`.
+
+`cast` can also output type information or the raw bytes of each field (in hex):
+
+```bash
+new "$jamdef" 850 700 true | cast "$jamdef" --with-defs --with-raws
+
+fruit:  850     [52 03 00 00 00 00 00 00]       (integral (signed #f) (endian little) (width 8))
+sugar:  700     [bc 02 00 00 00 00 00 00]       (integral (signed #f) (endian little) (width 8))
+cooked: true    [01]    (bool)
+```
+
+It can write out in env format, to be sourced directly in a bash-like script without parsing:
+
+```bash
+new "$jamdef" 850 700 true | cast "$jamdef" -o env
+
+fruit=850
+sugar=700
+cooked=true
+```
+
+And it can write types and raws like that too:
+
+
+```bash
+new "$jamdef" 850 700 true | cast "$jamdef" --with-defs --with-raws -o env
+
+fruit=850
+fruit__DEF=(integral (signed #f) (endian little) (width 8))
+fruit__RAW=5203000000000000
+sugar=700
+sugar__DEF=(integral (signed #f) (endian little) (width 8))
+sugar__RAW=bc02000000000000
+cooked=true
+cooked__DEF=(bool)
+cooked__RAW=01
+```
+
+When constructing with `new`, padding is zeroes, which is different from how programs construct
+values (where padding is undefined, and turns out to be garbage data), and omitted values are also
+zeroes, which is different from how programs do it (in most languages) in that the compiler would
+complain if you didn't fill all the fields.
+
+Which brings us to pathing: how to specify which field gets which value.
+
+Firstly, the `new` tool has a flag `--show-fields` or `-F` that will, instead of normal operation,
+show the fields of the given def and two important values: the ARG and the STRUCTURAL PATH.
+
+```bash
+new "$jamdef" -F
+
+[ARG]  STRUCTURAL PATH                      DESCRIPTION
+[  0]  .fruit                               Integral(Integral { signed: false, endian: Little, width: 8 })
+[  1]  .sugar                               Integral(Integral { signed: false, endian: Little, width: 8 })
+[  2]  .cooked                              Boolean(Boolean { width: 1 })
+```
+
+The ARG is the "argument order", in which non-pathed arguments will be taken and applied to each
+field. The STRUCTURAL PATH is how to specify fields regardless of order.
+
+Here's various _equivalent_ calls for our example:
+
+```bash
+new "$jamdef" .fruit:850 .sugar:700 .cooked:true
+new "$jamdef" .cooked:true .fruit:850 .sugar:700
+new "$jamdef" .fruit:850 .sugar:700 true
+new "$jamdef" .fruit:850 true .sugar:700
+new "$jamdef" .sugar:700 850 true
+```
+
+And here's a demonstration of leaving all fields blank, creating an all-zero (but correctly-sized!)
+binary blob:
+
+```bash
+new "$jamdef" | hexdump -C
+
+00000000  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+00000010  00 00 00 00 00 00 00 00                           |........|
+00000018
+```
+
+### libc tooling
 
 WIP
