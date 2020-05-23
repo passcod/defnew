@@ -178,11 +178,9 @@ fn main() -> color_eyre::Result<()> {
 			#[rustfmt::skip]
 			#[allow(deprecated)]
 			fn main() {{
+				let author = format!("CC BY-SA-NC 4.0 - {{}}", env!("CARGO_PKG_HOMEPAGE"));
 				let args = clap::App::new("defnew")
-					.author(&*format!(
-						"CC BY-SA-NC 4.0 - {{}}",
-						env!("CARGO_PKG_HOMEPAGE")
-					))
+					.author(author.as_str())
 					.about("libc-const: provides values for libc constants")
 					.after_help("Values are hard-coded at compile and are not guaranteed to be correct for your system.")
 					.version(clap::crate_version!())
@@ -193,7 +191,7 @@ fn main() -> color_eyre::Result<()> {
 		for constant in &consts {
 			writeln!(
 				&libc_const_file,
-				r#".subcommand(clap::SubCommand::with_name("{}"))"#,
+				r#".subcommand(clap::App::new("{}"))"#,
 				constant
 			)?;
 		}
@@ -226,10 +224,6 @@ fn main() -> color_eyre::Result<()> {
 		println!("wrote src/bin/libc-const.rs");
 	}
 
-	// for (name, def) in types {
-	// 	println!("\n{} = {}", name, def);
-	// }
-
 	// libc-def
 	{
 		println!("resolving {} types", types.len());
@@ -244,11 +238,9 @@ fn main() -> color_eyre::Result<()> {
 			#[rustfmt::skip]
 			#[allow(deprecated)]
 			fn main() {{
+				let author = format!("CC BY-SA-NC 4.0 - {{}}", env!("CARGO_PKG_HOMEPAGE"));
 				let args = clap::App::new("defnew")
-					.author(&*format!(
-						"CC BY-SA-NC 4.0 - {{}}",
-						env!("CARGO_PKG_HOMEPAGE")
-					))
+					.author(author.as_ref())
 					.about("libc-def: provides defs for libc types")
 					.after_help("Defs are hard-coded at compile and are not guaranteed to be correct for your system.")
 					.version(clap::crate_version!())
@@ -257,11 +249,7 @@ fn main() -> color_eyre::Result<()> {
 		)?;
 
 		for (name, _) in &types {
-			writeln!(
-				&libc_def_file,
-				r#".subcommand(clap::SubCommand::with_name("{}"))"#,
-				name
-			)?;
+			writeln!(&libc_def_file, r#".subcommand(clap::App::new("{}"))"#, name)?;
 		}
 
 		writeln!(
