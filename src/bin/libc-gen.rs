@@ -1,3 +1,6 @@
+#![cfg_attr(not(feature = "libc-gen"), allow(dead_code))]
+#![cfg_attr(not(feature = "libc-gen"), allow(unused_imports))]
+
 use defnew::{parse_def, Def};
 use html5ever::tendril::stream::TendrilSink;
 use kuchiki::{parse_html, NodeRef};
@@ -10,6 +13,13 @@ use std::{
 };
 use syn::{Attribute, Type};
 use thiserror::Error;
+
+#[cfg(not(feature = "libc-gen"))]
+fn main() {
+	panic!(
+		"libc-gen only makes sense to be called in development, with the libc-gen feature enabled"
+	);
+}
 
 #[derive(Debug, Error)]
 enum Error {
@@ -93,6 +103,7 @@ const IGNORED_TYPES: [&'static str; 14] = [
 	"ifaddrs",    // recursive
 ];
 
+#[cfg(feature = "libc-gen")]
 fn main() -> color_eyre::Result<()> {
 	if !Command::new("cargo")
 		.arg("doc")
