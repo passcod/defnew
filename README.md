@@ -341,3 +341,10 @@ new "$jamdef" | hexdump -C
 ### libc tooling
 
 WIP
+
+no, like, really WIP, the actual tools aren't finished
+
+What you can do so far:
+
+- with `libc-const`, get the value (and the list, via help) of every constant in libc
+- with `libc-def`, get the def of every top level type in libc
