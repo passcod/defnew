@@ -2,10 +2,13 @@
 
 _A toolkit for interacting with C ABI binary data and libc, from a shell._
 
+[license]: https://creativecommons.org/licenses/by-nc-sa/4.0/
+[caretaker]: https://caretaker.passcod.name
+
 ## Foreword
 
 This is a personal project. I use it. It is not open source software, but you can use it, subject
-to its license: [Creative Commons Attribution-ShareAlike-NonCommercial][license]. You may also
+to its license: [Creative Commons Attribution-NonCommercial-ShareAlike][license]. You may also
 contribute: it operates on [the Caretaker model][caretaker] rather than usual open source rules.
 
 The backstory for this project is that one day I bemoaned for the Nth time that I wasn't able to
@@ -25,11 +28,17 @@ Defnew has three main parts: **def**initions, the **new** and **cast** tools, an
 
 ### Definitions
 
-Defnew has its own format for expressing type information. Representationally, it is a s-expression.
-This is for three reasons: one, the parser is already written (the `lexpr` crate) and as it is a
-common format, many other languages and tools are able to parse it also; two, is it human-readable
-and human-writable, supports comments, can be prettified, and so on; three, it is trivial to nest a
-full **def** inside another **def** by simple string interpolation, such as is common in shells.
+Defnew has its own format for expressing type information.
+
+One such "type definition" is called a "**def**."
+
+Representationally, it is an s-expression. This is for three reasons: one, the parser is already
+written (the [`lexpr`] crate) and as it is a common format, many other languages and tools are able
+to parse it also; two, is it human-readable and human-writable, supports comments, can be
+prettified, and so on; three, it is trivial to nest a full def inside another def by simple string
+interpolation, such as is common in shells.
+
+[`lexpr`]: https://github.com/rotty/lexpr-rs
 
 Let's go through some examples:
 
