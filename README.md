@@ -8,8 +8,9 @@ _A toolkit for interacting with C ABI binary data and libc, from a shell._
 ## Foreword
 
 This is a personal project. I use it. It is not open source software, but you can use it, subject
-to its license: [Creative Commons Attribution-NonCommercial-ShareAlike][license]. You may also
-contribute: it operates on [the Caretaker model][caretaker] rather than usual open source rules.
+to its license: [Creative Commons Attribution-NonCommercial-ShareAlike][license] with some
+[additional details at the top of the LICENSE file](./LICENSE). You may also contribute: it
+operates on [the Caretaker model][caretaker] rather than usual open source rules.
 
 The backstory for this project is that one day I bemoaned for the Nth time that I wasn't able to
 just call arbitrary libc functions from my shell, and decided to do something about it, if I could.
