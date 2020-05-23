@@ -1,82 +1,81 @@
-#[macro_use]
-extern crate clap;
-
-use clap::{App, AppSettings, Arg, SubCommand};
+use clap::{App, AppSettings, Arg};
 use defnew::{
 	def::{self, layout::Layable, Def},
 	parse_def, platform,
 };
+use eyre::{eyre, WrapErr};
 use lexpr::Value;
 use std::str::FromStr;
 use thiserror::Error;
 
 fn main() -> color_eyre::Result<()> {
 	let pointer_width_default = platform::native::POINTER_WIDTH.to_string();
-	let endianness = Arg::with_name("endian")
+	let endianness = Arg::new("endian")
 		.long("endian")
 		.takes_value(true)
 		.possible_values(&["little", "big", "native"])
-		.help("Specifies endianness");
+		.about("Specifies endianness");
 
-	let args = App::new("defnew")
-		.author(&*format!("CC BY-SA-NC 4.0 - {}", env!("CARGO_PKG_HOMEPAGE")))
+	let author = format!("CC BY-SA-NC 4.0 - {}", env!("CARGO_PKG_HOMEPAGE"));
+	let mut app = App::new("defnew")
+		.author(author.as_str())
 		.about("def: constructs, normalises, and lays out defs")
 		.version(clap::crate_version!())
 		.setting(AppSettings::AllowExternalSubcommands)
 		.after_help("There are also type aliases: {i,u}{8,16,32,64,128}, f{32,64}, and {i,u}size (depending on platform).")
 		.arg(
-			Arg::with_name("show-layout")
-				.short("L")
+			Arg::new("show-layout")
+				.short('L')
 				.long("show-layout")
-				.help("Prints layout to stderr"),
+				.about("Prints layout to stderr"),
 		)
 		.subcommand(
-			SubCommand::with_name("bool")
+			App::new("bool")
 				.about("Makes a boolean def")
 				.arg(
-					Arg::with_name("width")
+					Arg::new("width")
 						.takes_value(true)
 						.default_value("1")
 						.value_name("bytes")
-						.help("Specifies boolean width"),
+						.about("Specifies boolean width"),
 				),
 		)
 		.subcommand(
-			SubCommand::with_name("int")
+			App::new("int")
 				.about("Makes a signed integral def")
 				.arg(endianness.clone())
 				.arg(
-					Arg::with_name("width")
+					Arg::new("width")
 						.takes_value(true)
 						.value_name("bytes")
 						.required(true)
-						.help("Integral width"),
+						.about("Integral width"),
 				),
 		)
 		.subcommand(
-			SubCommand::with_name("uint")
+			App::new("uint")
 				.about("Makes an unsigned integral def")
 				.arg(endianness.clone())
 				.arg(
-					Arg::with_name("width")
+					Arg::new("width")
 						.takes_value(true)
 						.value_name("bytes")
 						.required(true)
-						.help("Integral width"),
+						.about("Integral width"),
 				),
 		)
 		.subcommand(
-			SubCommand::with_name("float")
+			App::new("float")
 				.about("Makes a floating point def")
 				.arg(endianness.clone())
 				.arg(
-					Arg::with_name("min align")
+					Arg::new("min align")
 						.long("align")
 						.takes_value(true)
-						.help("Specifies float alignment"),
+						.about("Specifies float alignment"),
 				)
 				.arg(
-					Arg::with_name("format")
+					Arg::new("format")
 						.takes_value(true)
 						.possible_values(&[
 							"binary-16",
@@ -89,181 +88,187 @@ fn main() -> color_eyre::Result<()> {
 							"decimal-128",
 						])
 						.required(true)
-						.help("Float format"),
+						.about("Float format"),
 				),
 		)
 		.subcommand(
-			SubCommand::with_name("struct")
+			App::new("struct")
 				.about("Makes a struct def")
 				.arg(
-					Arg::with_name("name")
+					Arg::new("name")
 						.long("name")
 						.takes_value(true)
-						.help("Names the struct"),
+						.about("Names the struct"),
 				)
 				.arg(
-					Arg::with_name("align")
+					Arg::new("align")
 						.long("align")
 						.takes_value(true)
 						.value_name("min align")
-						.help("Raises struct alignment"),
+						.about("Raises struct alignment"),
 				)
 				.arg(
-					Arg::with_name("packed")
+					Arg::new("packed")
 						.long("packed")
 						.takes_value(true)
 						.value_name("max align")
-						.help("Lowers struct alignment"),
+                		.require_equals(true)
+						.about("Lowers struct alignment"),
 				)
 				.arg(
-					Arg::with_name("types")
+					Arg::new("types")
 						.takes_value(true)
 						.value_name("[name:]type")
 						.multiple(true)
-						.help("Fields (zero or more)"),
+						.about("Fields (zero or more)"),
 				),
 		)
 		.subcommand(
-			SubCommand::with_name("enum")
+			App::new("enum")
 				.about("Makes an enum def")
 				.arg(
-					Arg::with_name("name")
+					Arg::new("name")
 						.long("name")
 						.takes_value(true)
-						.help("Names the enum"),
+						.about("Names the enum"),
 				)
 				.arg(
-					Arg::with_name("width")
+					Arg::new("width")
 						.long("width")
 						.takes_value(true)
-						.help("Raises enum width"),
+						.about("Raises enum width"),
 				)
 				.arg(endianness.clone())
 				.arg(
-					Arg::with_name("variants")
+					Arg::new("variants")
 						.takes_value(true)
 						.value_name("name[:discriminant]")
 						.multiple(true)
 						.required(true)
 						.min_values(1)
-						.help("Variants (one or more)"),
+						.about("Variants (one or more)"),
 				),
 		)
 		.subcommand(
-			SubCommand::with_name("union")
+			App::new("union")
 				.about("Makes a union def")
 				.arg(
-					Arg::with_name("name")
+					Arg::new("name")
 						.long("name")
 						.takes_value(true)
-						.help("Names the union"),
+						.about("Names the union"),
 				)
 				.arg(
-					Arg::with_name("align")
+					Arg::new("align")
 						.long("align")
 						.takes_value(true)
-						.help("Raises union alignment"),
+						.about("Raises union alignment"),
 				)
 				.arg(
-					Arg::with_name("alterns")
+					Arg::new("alterns")
 						.takes_value(true)
 						.value_name("name:type")
 						.multiple(true)
 						.required(true)
 						.min_values(1)
-						.help("Alternates (one or more)"),
+						.about("Alternates (one or more)"),
 				),
 		)
 		.subcommand(
-			SubCommand::with_name("array")
+			App::new("array")
 				.about("Makes an array def")
 				.arg(
-					Arg::with_name("name")
+					Arg::new("name")
 						.long("name")
 						.takes_value(true)
-						.help("Names the array"),
+						.about("Names the array"),
 				)
 				.arg(
-					Arg::with_name("stride")
+					Arg::new("stride")
 						.long("stride")
 						.takes_value(true)
-						.help("Specifies array stride"),
+						.about("Specifies array stride"),
 				)
 				.arg(
-					Arg::with_name("length")
+					Arg::new("length")
 						.takes_value(true)
 						.required(true)
-						.help("Array length (zero for unspecified)"),
+						.about("Array length (zero for unspecified)"),
 				)
 				.arg(
-					Arg::with_name("type")
+					Arg::new("type")
 						.takes_value(true)
 						.required(true)
-						.help("Array element type"),
+						.about("Array element type"),
 				),
 		)
 		.subcommand(
-			SubCommand::with_name("opaque")
+			App::new("opaque")
 				.about("Makes an opaque def (low-level)")
 		)
 		.subcommand(
-			SubCommand::with_name("pointer")
+			App::new("pointer")
 				.about("Makes a raw pointer def (low-level)")
 				.arg(endianness.clone())
 				.arg(
-					Arg::with_name("width")
+					Arg::new("width")
 						.long("width")
 						.takes_value(true)
 						.default_value(&pointer_width_default)
-						.help("Specifies pointer width"),
+						.about("Specifies pointer width"),
 				)
 				.arg(
-					Arg::with_name("mutable")
-						.help("Whether pointer is mutable"),
+					Arg::new("mutable")
+						.about("Whether pointer is mutable"),
 				)
 				.arg(
-					Arg::with_name("points-to")
+					Arg::new("points-to")
 						.long("points-to")
 						.takes_value(true)
 						.value_name("def")
-						.help("Specifies what type is behind the pointer"),
+						.about("Specifies what type is behind the pointer"),
 				)
 				.arg(
-					Arg::with_name("context")
+					Arg::new("context")
 						.takes_value(true)
 						.possible_values(&["local", "remote"])
 						.required(true)
-						.help("Pointer context (if it's pointing out or within the def)"),
+						.about("Pointer context (if it's pointing out or within the def)"),
 				)
 				.arg(
-					Arg::with_name("value")
+					Arg::new("value")
 						.takes_value(true)
 						.required(true)
-						.help("Pointer value (decimal)"),
+						.about("Pointer value (decimal)"),
 				),
 		)
 		.subcommand(
-			SubCommand::with_name("padding")
+			App::new("padding")
 				.about("Makes a padding def (low-level)")
 				.arg(
-					Arg::with_name("bits")
+					Arg::new("bits")
 						.takes_value(true)
 						.required(true)
-						.help("Length of the padding"),
+						.about("Length of the padding"),
 				),
 		)
 		.subcommand(
-			SubCommand::with_name("parse")
+			App::new("parse")
 				.about("Parses an s-expression of any arbitrary def")
 				.arg(
-					Arg::with_name("def")
+					Arg::new("def")
 						.takes_value(true)
 						.value_name("s-exp")
 						.required(true)
-						.help("Arbitrary def"),
+						.about("Arbitrary def"),
 				),
-		)
-		.get_matches();
+		);
+
+	let mut help = Vec::new();
+	app.write_help(&mut help).map_err(ClapError)?;
+	let help = String::from_utf8(help)?;
+
+	let args = app.get_matches();
 
 	let def = match args.subcommand() {
 		("bool", Some(subargs)) => make_bool(subargs),
@@ -276,28 +281,24 @@ fn main() -> color_eyre::Result<()> {
 		("union", Some(subargs)) => make_union(subargs),
 		("array", Some(subargs)) => make_array(subargs),
 
-		("opaque", _) => Def::Opaque,
+		("opaque", _) => Ok(Def::Opaque),
 		("pointer", Some(subargs)) => make_pointer(subargs),
 		("padding", Some(subargs)) => make_padding(subargs),
 
 		("parse", Some(subargs)) => {
-			let typestr = value_t!(subargs, "def", String).unwrap_or_else(|e| e.exit());
-
-			parse_def(&typestr).unwrap_or_else(|err| {
-				clap::Error::with_description(&err.to_string(), clap::ErrorKind::InvalidValue)
-					.exit()
-			})
+			let typestr: String = subargs.value_of_t("def").map_err(ClapError)?;
+			parse_def(&typestr).map_err(|e| e.into())
 		}
 
 		(alias, _) => {
 			if let Some(def) = platform::parse_native_type(alias) {
-				def
+				Ok(def)
 			} else {
-				eprintln!("{}", args.usage());
-				return Err(NoCommandProvided)?;
+				eprintln!("{}", help);
+				Err(NoCommandProvided).wrap_err_with(|| format!("no such command: {}", alias))
 			}
 		}
-	};
+	}?;
 
 	if args.is_present("show-layout") {
 		eprintln!("{}", def.layout());
@@ -311,55 +312,56 @@ fn main() -> color_eyre::Result<()> {
 #[error("unrecognised type or type alias")]
 struct NoCommandProvided;
 
-fn make_bool(args: &clap::ArgMatches<'_>) -> Def {
-	use def::{Boolean, ByteWidth};
-	let width = value_t!(args, "width", ByteWidth).unwrap_or_else(|e| e.exit());
+#[derive(Debug, Error)]
+#[error("argument error: {0}")]
+struct ClapError(clap::Error);
 
-	Def::Boolean(Boolean { width })
+fn make_bool(args: &clap::ArgMatches) -> color_eyre::Result<Def> {
+	use def::{Boolean, ByteWidth};
+	let width: ByteWidth = args.value_of_t("width").map_err(ClapError)?;
+
+	Ok(Def::Boolean(Boolean { width }))
 }
 
-fn make_integral(args: &clap::ArgMatches<'_>, signed: bool) -> Def {
-	use def::{ByteWidth, Endianness, Integral};
-	let width = value_t!(args, "width", ByteWidth).unwrap_or_else(|e| e.exit());
-	let endian = value_t!(args, "endian", Endianness)
+fn make_integral(args: &clap::ArgMatches, signed: bool) -> color_eyre::Result<Def> {
+	use def::Integral;
+	let width = args.value_of_t("width").map_err(ClapError)?;
+	let endian = args
+		.value_of_t("endian")
 		.map(Some)
 		.unwrap_or_else(exit_unless_none)
 		.unwrap_or(platform::native::ENDIAN);
 
-	Def::Integral(Integral {
+	Ok(Def::Integral(Integral {
 		signed,
 		endian,
 		width,
-	})
+	}))
 }
 
-fn make_float(args: &clap::ArgMatches<'_>) -> Def {
-	use def::{
-		float::{Float, Format},
-		Alignment, Endianness,
-	};
+fn make_float(args: &clap::ArgMatches) -> color_eyre::Result<Def> {
+	use def::float::Float;
 
-	let format = value_t!(args, "format", Format).unwrap_or_else(|e| e.exit());
-	let endian = value_t!(args, "endian", Endianness)
+	let format = args.value_of_t("format").map_err(ClapError)?;
+	let endian = args
+		.value_of_t("endian")
 		.map(Some)
 		.unwrap_or_else(exit_unless_none)
 		.unwrap_or(platform::native::ENDIAN);
-	let align = value_t!(args, "align", Alignment)
+	let align = args
+		.value_of_t("align")
 		.map(Some)
 		.unwrap_or_else(exit_unless_none);
 
-	Def::Float(Float {
+	Ok(Def::Float(Float {
 		format,
 		endian,
 		align,
-	})
+	}))
 }
 
-fn make_struct(args: &clap::ArgMatches<'_>) -> Def {
-	use def::{
-		r#struct::{Field, Struct},
-		Alignment,
-	};
+fn make_struct(args: &clap::ArgMatches) -> color_eyre::Result<Def> {
+	use def::r#struct::{Field, Struct};
 	let types = args.values_of("types").unwrap_or_default();
 	let mut fields = Vec::with_capacity(types.len());
 
@@ -389,23 +391,22 @@ fn make_struct(args: &clap::ArgMatches<'_>) -> Def {
 		});
 	}
 
-	Def::Struct(Struct {
-		name: value_t!(args, "name", String).ok(),
-		align: value_t!(args, "align", Alignment)
+	Ok(Def::Struct(Struct {
+		name: args.value_of_t("name").ok(),
+		align: args
+			.value_of_t("align")
 			.map(Some)
 			.unwrap_or_else(exit_unless_none),
-		packed: value_t!(args, "packed", Alignment)
+		packed: args
+			.value_of_t("packed")
 			.map(Some)
 			.unwrap_or_else(exit_unless_none),
 		fields,
-	})
+	}))
 }
 
-fn make_enum(args: &clap::ArgMatches<'_>) -> Def {
-	use def::{
-		r#enum::{Enum, Variant},
-		ByteWidth, Endianness,
-	};
+fn make_enum(args: &clap::ArgMatches) -> color_eyre::Result<Def> {
+	use def::r#enum::{Enum, Variant};
 
 	let vars = args.values_of("variants").unwrap_or_default();
 
@@ -420,13 +421,7 @@ fn make_enum(args: &clap::ArgMatches<'_>) -> Def {
 		};
 
 		if let Some(d) = disc {
-			value = d.parse().unwrap_or_else(|_| {
-				clap::Error::with_description(
-					"discriminant must be a number",
-					clap::ErrorKind::InvalidValue,
-				)
-				.exit()
-			});
+			value = d.parse().wrap_err("discriminant must be a number")?;
 		}
 
 		variants.push(Variant {
@@ -436,24 +431,23 @@ fn make_enum(args: &clap::ArgMatches<'_>) -> Def {
 		value += 1;
 	}
 
-	Def::Enum(Enum {
-		name: value_t!(args, "name", String).ok(),
-		width: value_t!(args, "width", ByteWidth)
+	Ok(Def::Enum(Enum {
+		name: args.value_of_t("name").ok(),
+		width: args
+			.value_of_t("width")
 			.map(Some)
 			.unwrap_or_else(exit_unless_none),
-		endian: value_t!(args, "endian", Endianness)
+		endian: args
+			.value_of_t("endian")
 			.map(Some)
 			.unwrap_or_else(exit_unless_none)
 			.unwrap_or(platform::native::ENDIAN),
 		variants,
-	})
+	}))
 }
 
-fn make_union(args: &clap::ArgMatches<'_>) -> Def {
-	use def::{
-		r#union::{Altern, Union},
-		Alignment,
-	};
+fn make_union(args: &clap::ArgMatches) -> color_eyre::Result<Def> {
+	use def::r#union::{Altern, Union};
 
 	let alts = args.values_of("alterns").unwrap_or_default();
 
@@ -462,87 +456,75 @@ fn make_union(args: &clap::ArgMatches<'_>) -> Def {
 		let parts: Vec<&str> = arg.splitn(2, ":").collect();
 		let (name, typestr) = match *parts {
 			[name, typestr] => (name, typestr),
-			_ => clap::Error::with_description(
-				"alternate format must be name:type",
-				clap::ErrorKind::InvalidValue,
-			)
-			.exit(),
+			_ => Err(eyre!("alternate format must be name:type"))?,
 		};
 
 		alterns.push(Altern {
 			name: name.into(),
-			def: parse_def(typestr).unwrap_or_else(|err| {
-				clap::Error::with_description(&err.to_string(), clap::ErrorKind::InvalidValue)
-					.exit()
-			}),
+			def: parse_def(typestr)?,
 		});
 	}
 
-	Def::Union(Union {
-		name: value_t!(args, "name", String).ok(),
-		align: value_t!(args, "align", Alignment)
+	Ok(Def::Union(Union {
+		name: args.value_of_t("name").ok(),
+		align: args
+			.value_of_t("align")
 			.map(Some)
 			.unwrap_or_else(exit_unless_none),
 		alterns,
-	})
+	}))
 }
 
-fn make_array(args: &clap::ArgMatches<'_>) -> Def {
+fn make_array(args: &clap::ArgMatches) -> color_eyre::Result<Def> {
 	use def::Array;
 	use std::num::NonZeroU64;
 
-	let typestr = value_t!(args, "type", String).unwrap_or_else(|e| e.exit());
+	let typestr: String = args.value_of_t("type").map_err(ClapError)?;
 
-	Def::Array(Array {
-		name: value_t!(args, "name", String).ok(),
-		stride: value_t!(args, "stride", NonZeroU64)
+	Ok(Def::Array(Array {
+		name: args.value_of_t("name").ok(),
+		stride: args
+			.value_of_t("stride")
 			.map(Some)
 			.unwrap_or_else(exit_unless_none),
-		length: NonZeroU64::new(value_t!(args, "length", u64).unwrap_or_else(|e| e.exit())),
-		def: Box::new(parse_def(&typestr).unwrap_or_else(|err| {
-			clap::Error::with_description(&err.to_string(), clap::ErrorKind::InvalidValue).exit()
-		})),
-	})
+		length: NonZeroU64::new(args.value_of_t("length").map_err(ClapError)?),
+		def: Box::new(parse_def(&typestr)?),
+	}))
 }
 
-fn make_pointer(args: &clap::ArgMatches<'_>) -> Def {
-	use def::{
-		pointer::{Context, Pointer},
-		ByteWidth, Endianness,
-	};
+fn make_pointer(args: &clap::ArgMatches) -> color_eyre::Result<Def> {
+	use def::pointer::Pointer;
 
-	let width = value_t!(args, "width", ByteWidth).unwrap_or_else(|e| e.exit());
-	let endian = value_t!(args, "endian", Endianness)
+	let width = args.value_of_t("width").map_err(ClapError)?;
+	let endian = args
+		.value_of_t("endian")
 		.map(Some)
 		.unwrap_or_else(exit_unless_none)
 		.unwrap_or(platform::native::ENDIAN);
 
-	let context = value_t!(args, "context", Context).unwrap_or_else(|e| e.exit());
-	let value = value_t!(args, "value", u64).unwrap_or_else(|e| e.exit());
+	let context = args.value_of_t("context").map_err(ClapError)?;
+	let value = args.value_of_t("value").map_err(ClapError)?;
 	let mutable = args.is_present("mutable");
 
 	let def = if let Some(typestr) = args.value_of("points-to") {
-		Some(Box::new(parse_def(typestr).unwrap_or_else(|err| {
-			clap::Error::with_description(&err.to_string(), clap::ErrorKind::InvalidValue).exit()
-		})))
+		Some(Box::new(parse_def(typestr)?))
 	} else {
 		None
 	};
 
-	Def::Pointer(Pointer {
+	Ok(Def::Pointer(Pointer {
 		width,
 		endian,
 		context,
 		mutable,
 		value,
 		def,
-	})
+	}))
 }
 
-fn make_padding(args: &clap::ArgMatches<'_>) -> Def {
-	use std::num::NonZeroU64;
-	let bits = value_t!(args, "bits", NonZeroU64).unwrap_or_else(|e| e.exit());
-	Def::Padding(bits)
+fn make_padding(args: &clap::ArgMatches) -> color_eyre::Result<Def> {
+	let bits = args.value_of_t("bits").map_err(ClapError)?;
+	Ok(Def::Padding(bits))
 }
 
 // TODO: improve this to return 1/ the argument name, 2/ the FromStr error message
@@ -550,6 +532,6 @@ fn exit_unless_none<T>(e: clap::Error) -> Option<T> {
 	if let clap::ErrorKind::ArgumentNotFound = e.kind {
 		None
 	} else {
-		e.exit()
+		panic!("{}", e)
 	}
 }

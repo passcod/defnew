@@ -1,6 +1,3 @@
-#[macro_use]
-extern crate clap;
-
 use clap::{App, Arg};
 use defnew::{
 	def::{
@@ -24,40 +21,38 @@ fn main() -> color_eyre::Result<()> {
 		.about("new: given a def and some values (missing ones default to zeroed), outputs bytes")
 		.version(clap::crate_version!())
 		.arg(
-			Arg::with_name("show-fields")
+			Arg::new("show-fields")
 				.long("show-fields")
-				.short("F")
-				.help("Shows field paths for the def given instead"),
+				.short('F')
+				.about("Shows field paths for the def given instead"),
 		)
 		.arg(
-			Arg::with_name("file")
+			Arg::new("file")
 				.long("output")
-				.short("o")
+				.short('o')
 				.takes_value(true)
 				.value_name("path")
-				.help("Writes to file instead of stdout"),
+				.about("Writes to file instead of stdout"),
 		)
 		.arg(
-			Arg::with_name("def")
+			Arg::new("def")
 				.takes_value(true)
 				.value_name("s-exp")
 				.required(true)
-				.help("Type definition"),
+				.about("Type definition"),
 		)
 		.arg(
-			Arg::with_name("values")
+			Arg::new("values")
 				.takes_value(true)
 				.value_name("[path:]value")
 				.multiple(true)
-				.help("Values to fill in"),
+				.about("Values to fill in"),
 		)
 		.get_matches();
 
-	let typestr = value_t!(args, "def", String).unwrap_or_else(|e| e.exit());
+	let typestr: String = args.value_of_t("def").unwrap_or_else(|e| e.exit());
 
-	let def = parse_def(&typestr).unwrap_or_else(|err| {
-		clap::Error::with_description(&err.to_string(), clap::ErrorKind::InvalidValue).exit()
-	});
+	let def = parse_def(&typestr)?;
 
 	let layout = def.layout();
 

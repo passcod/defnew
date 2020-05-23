@@ -1,6 +1,3 @@
-#[macro_use]
-extern crate clap;
-
 use clap::{App, Arg};
 use defnew::{
 	def::{castable::Castable, layout::Layable, Family},
@@ -13,6 +10,7 @@ use std::{
 	io::{stdin, BufReader, Read},
 	str::FromStr,
 };
+use thiserror::Error;
 
 fn main() -> color_eyre::Result<()> {
 	let args = App::new("defnew")
@@ -23,49 +21,47 @@ fn main() -> color_eyre::Result<()> {
 		.about("cast: reads bytes from stdin and parses them according to a given def")
 		.version(clap::crate_version!())
 		.arg(
-			Arg::with_name("file")
+			Arg::new("file")
 				.long("file")
-				.short("f")
+				.short('f')
 				.takes_value(true)
-				.help("File to read data from instead of stdin"),
+				.about("File to read data from instead of stdin"),
 		)
 		.arg(
-			Arg::with_name("output-format")
+			Arg::new("output-format")
 				.long("output")
-				.short("o")
+				.short('o')
 				.possible_values(&["plain", "env"])
 				.default_value("plain")
-				.help("Format to output data as"),
+				.about("Format to output data as"),
 		)
 		.arg(
-			Arg::with_name("with-types")
+			Arg::new("with-types")
 				.long("with-types")
-				.help("Add output entries containing basic type names for each field"),
+				.about("Add output entries containing basic type names for each field"),
 		)
 		.arg(
-			Arg::with_name("with-defs")
+			Arg::new("with-defs")
 				.long("with-defs")
-				.help("Add output entries containing type defs for each field"),
+				.about("Add output entries containing type defs for each field"),
 		)
 		.arg(
-			Arg::with_name("with-raws")
+			Arg::new("with-raws")
 				.long("with-raws")
-				.help("Add output entries containing raw bytes for each field"),
+				.about("Add output entries containing raw bytes for each field"),
 		)
 		.arg(
-			Arg::with_name("def")
+			Arg::new("def")
 				.takes_value(true)
 				.value_name("def s-exp")
 				.required(true)
-				.help("Type definition"),
+				.about("Type definition"),
 		)
 		.get_matches();
 
-	let typestr = value_t!(args, "def", String).unwrap_or_else(|e| e.exit());
+	let typestr: String = args.value_of_t("def").map_err(ClapError)?;
 
-	let def = parse_def(&typestr).unwrap_or_else(|err| {
-		clap::Error::with_description(&err.to_string(), clap::ErrorKind::InvalidValue).exit()
-	});
+	let def = parse_def(&typestr)?;
 
 	let layout = def.layout();
 
@@ -109,7 +105,7 @@ fn main() -> color_eyre::Result<()> {
 		}
 	});
 
-	let format = value_t_or_exit!(args, "output-format", Format);
+	let format = args.value_of_t("output-format").map_err(ClapError)?;
 
 	let with = With {
 		types: args.is_present("with-types"),
@@ -126,6 +122,10 @@ fn main() -> color_eyre::Result<()> {
 
 	Ok(())
 }
+
+#[derive(Debug, Error)]
+#[error("argument error: {0}")]
+struct ClapError(clap::Error);
 
 #[derive(Clone, Debug)]
 struct Field {
